@@ -30,7 +30,7 @@ export default function Home() {
   // ── Home screen settings ──
   const [selectedSubtopics, setSelectedSubtopics] = useState<Set<string>>(new Set());
   const [selectedDifficulties, setSelectedDifficulties] = useState<Set<Difficulty>>(
-    new Set(['Easy', 'Medium', 'Hard'])
+    new Set<Difficulty>(['Easy', 'Medium', 'Hard'])
   );
   const [questionCount, setQuestionCount] = useState(10);
 
