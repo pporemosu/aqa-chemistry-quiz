@@ -451,6 +451,9 @@ export default function Home() {
             </div>
           </div>
         </div>
+        <p className="text-center text-purple-300/60 text-xs mt-8">
+          Mrs P Oremosu · Loxford School
+        </p>
       </div>
     );
   }
@@ -635,6 +638,9 @@ export default function Home() {
               {isLast ? 'Finish & See Results →' : 'Next Question →'}
             </button>
           </div>
+          <p className="text-center text-gray-600 text-xs mt-6">
+            Mrs P Oremosu · Loxford School
+          </p>
         </div>
       </div>
     );
@@ -795,6 +801,9 @@ export default function Home() {
               🔄 Retry Same Settings
             </button>
           </div>
+          <p className="text-center text-gray-600 text-xs mt-6">
+            Mrs P Oremosu · Loxford School
+          </p>
         </div>
       </div>
     );
