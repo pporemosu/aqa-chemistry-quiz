@@ -2,6 +2,9 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { questions, TOPICS, type Question, type Difficulty } from '@/data/questions';
+import pkg from '../package.json';
+
+const APP_VERSION = pkg.version;
 
 type Screen = 'home' | 'quiz' | 'results';
 
@@ -452,7 +455,7 @@ export default function Home() {
           </div>
         </div>
         <p className="text-center text-purple-300/60 text-xs mt-8">
-          Mrs P Oremosu · Loxford School
+          Mrs P Oremosu · Loxford School · <span className="font-mono">v{APP_VERSION}</span>
         </p>
       </div>
     );
@@ -639,7 +642,7 @@ export default function Home() {
             </button>
           </div>
           <p className="text-center text-gray-600 text-xs mt-6">
-            Mrs P Oremosu · Loxford School
+            Mrs P Oremosu · Loxford School · <span className="font-mono">v{APP_VERSION}</span>
           </p>
         </div>
       </div>
@@ -802,7 +805,7 @@ export default function Home() {
             </button>
           </div>
           <p className="text-center text-gray-600 text-xs mt-6">
-            Mrs P Oremosu · Loxford School
+            Mrs P Oremosu · Loxford School · <span className="font-mono">v{APP_VERSION}</span>
           </p>
         </div>
       </div>
