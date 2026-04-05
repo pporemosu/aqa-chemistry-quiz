@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { questions, TOPICS, type Question, type Difficulty } from '@/data/questions';
 import pkg from '../package.json';
 
@@ -15,6 +15,17 @@ interface QuizState {
   revealed: boolean[];
   maxRevealedIndex: number;
 }
+
+interface SessionRecord {
+  date: string;
+  score: number;
+  total: number;
+  pct: number;
+  weakSubtopics: string[];
+}
+
+const HISTORY_KEY = 'aqaChem_history';
+const MAX_HISTORY = 20;
 
 const DIFFICULTY_COLORS: Record<Difficulty, string> = {
   Easy: 'bg-green-100 text-green-800 border-green-300',
@@ -71,6 +82,13 @@ export default function Home() {
   // ── Quiz state ──
   const [quiz, setQuiz] = useState<QuizState | null>(null);
 
+  // ── Session history (localStorage) ──
+  const [history, setHistory] = useState<SessionRecord[]>([]);
+  const savedSession = useRef(false);
+
+  // ── Collapsible review cards ──
+  const [expandedReviewCards, setExpandedReviewCards] = useState<Set<number>>(new Set());
+
   // ── Derived ──
   const availableCount = useMemo(() => {
     return questions.filter((q) => {
@@ -80,6 +98,14 @@ export default function Home() {
   }, [selectedSubtopics, selectedDifficulties]);
 
   const sliderMax = Math.min(50, availableCount);
+
+  // ── Load history from localStorage on mount ──
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(HISTORY_KEY);
+      if (stored) setHistory(JSON.parse(stored));
+    } catch {}
+  }, []);
 
   // ── Timer effect ──
   useEffect(() => {
@@ -112,6 +138,78 @@ export default function Home() {
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quiz?.currentIndex, screen, timerEnabled, timerSeconds]);
+
+  // ── Keyboard navigation ──
+  useEffect(() => {
+    if (screen !== 'quiz' || !quiz) return;
+    const currentQ = quiz.selectedQuestions[quiz.currentIndex];
+    if (!currentQ) return;
+
+    function handleKey(e: KeyboardEvent) {
+      if (!quiz) return;
+      if ((e.target as HTMLElement).tagName === 'INPUT') return;
+      const answered = quiz.revealed[quiz.currentIndex];
+
+      if (!answered) {
+        const keyMap: Record<string, number> = { a: 0, b: 1, c: 2, d: 3 };
+        const k = e.key.toLowerCase();
+        if (k in keyMap && keyMap[k] < currentQ.options.length) {
+          e.preventDefault();
+          handleAnswer(keyMap[k]);
+          return;
+        }
+      }
+      if (answered && (e.key === 'Enter' || e.key === 'ArrowRight')) {
+        e.preventDefault();
+        goNext();
+      }
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        goBack();
+      }
+    }
+
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, quiz?.currentIndex, quiz?.revealed]);
+
+  // ── Save session when results screen opens ──
+  useEffect(() => {
+    if (screen !== 'results' || !quiz || savedSession.current) return;
+    savedSession.current = true;
+
+    const subtopicStats: Record<string, { correct: number; total: number }> = {};
+    quiz.selectedQuestions.forEach((q, i) => {
+      if (!subtopicStats[q.subtopic]) subtopicStats[q.subtopic] = { correct: 0, total: 0 };
+      subtopicStats[q.subtopic].total++;
+      const a = quiz.answers[i];
+      if (a !== null && a >= 0 && a === q.correctAnswer) subtopicStats[q.subtopic].correct++;
+    });
+
+    const weakSubtopics = Object.entries(subtopicStats)
+      .filter(([, s]) => s.total > 0 && s.correct / s.total < 0.6)
+      .map(([name]) => name);
+
+    const currentScore = quiz.answers.filter(
+      (a, i) => a !== null && a >= 0 && a === quiz.selectedQuestions[i].correctAnswer
+    ).length;
+
+    const record: SessionRecord = {
+      date: new Date().toISOString(),
+      score: currentScore,
+      total: quiz.selectedQuestions.length,
+      pct: Math.round((currentScore / quiz.selectedQuestions.length) * 100),
+      weakSubtopics,
+    };
+
+    setHistory((prev) => {
+      const updated = [record, ...prev].slice(0, MAX_HISTORY);
+      try { localStorage.setItem(HISTORY_KEY, JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen]);
 
   // ── Helpers ──
   function toggleSubtopic(sub: string) {
@@ -156,11 +254,33 @@ export default function Home() {
     if (pool.length === 0) return;
     const count = Math.min(questionCount, pool.length);
     const selected = distributedShuffle(pool, count);
+    savedSession.current = false;
+    setExpandedReviewCards(new Set());
     setQuiz({
       selectedQuestions: selected,
       currentIndex: 0,
       answers: new Array(selected.length).fill(null),
       revealed: new Array(selected.length).fill(false),
+      maxRevealedIndex: -1,
+    });
+    setScreen('quiz');
+    window.scrollTo(0, 0);
+  }
+
+  function retryWrongOnly() {
+    if (!quiz) return;
+    const wrongQuestions = quiz.selectedQuestions.filter((q, i) => {
+      const a = quiz.answers[i];
+      return a === null || a === -1 || a !== q.correctAnswer;
+    });
+    if (wrongQuestions.length === 0) return;
+    savedSession.current = false;
+    setExpandedReviewCards(new Set());
+    setQuiz({
+      selectedQuestions: wrongQuestions,
+      currentIndex: 0,
+      answers: new Array(wrongQuestions.length).fill(null),
+      revealed: new Array(wrongQuestions.length).fill(false),
       maxRevealedIndex: -1,
     });
     setScreen('quiz');
@@ -186,7 +306,6 @@ export default function Home() {
     if (quiz.currentIndex >= quiz.selectedQuestions.length - 1) {
       setScreen('results');
     } else {
-      // Use functional update with a safety cap to prevent stale-closure over-increment
       setQuiz((prev) => {
         if (!prev) return prev;
         const nextIndex = prev.currentIndex + 1;
@@ -206,7 +325,16 @@ export default function Home() {
   function resetToHome() {
     setScreen('home');
     setQuiz(null);
+    setExpandedReviewCards(new Set());
     window.scrollTo(0, 0);
+  }
+
+  function toggleReviewCard(index: number) {
+    setExpandedReviewCards((prev) => {
+      const next = new Set(prev);
+      next.has(index) ? next.delete(index) : next.add(index);
+      return next;
+    });
   }
 
   // ── Score ──
@@ -216,6 +344,21 @@ export default function Home() {
       (a, i) => a !== null && a >= 0 && a === quiz.selectedQuestions[i].correctAnswer
     ).length;
   }, [quiz]);
+
+  // ── Weak areas derived from session history (last 10 sessions) ──
+  const weakAreas = useMemo(() => {
+    if (history.length === 0) return [];
+    const counts: Record<string, number> = {};
+    history.slice(0, 10).forEach((s) => {
+      s.weakSubtopics.forEach((t) => { counts[t] = (counts[t] ?? 0) + 1; });
+    });
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name]) => name);
+  }, [history]);
+
+  const recentTrend = history.slice(0, 10).reverse();
 
   // ── Render ──
   if (screen === 'home') return <HomeScreen />;
@@ -242,6 +385,63 @@ export default function Home() {
               Test yourself on every topic from the AQA specification
             </p>
           </div>
+
+          {/* Session history / progress panel */}
+          {history.length > 0 && (
+            <div className="bg-white/10 backdrop-blur rounded-2xl p-5 mb-6">
+              <div className="flex flex-wrap items-start gap-6">
+                {/* Score trend sparkline */}
+                <div className="flex-1 min-w-[140px]">
+                  <p className="text-xs text-purple-300 font-semibold uppercase tracking-wider mb-2">
+                    Recent Sessions
+                  </p>
+                  <div className="flex items-end gap-1 h-10">
+                    {recentTrend.map((s, i) => (
+                      <div
+                        key={i}
+                        title={`${s.pct}% · ${new Date(s.date).toLocaleDateString()}`}
+                        className={`flex-1 rounded-sm ${
+                          s.pct >= 70 ? 'bg-green-400' : s.pct >= 50 ? 'bg-yellow-400' : 'bg-red-400'
+                        }`}
+                        style={{ height: `${Math.max(12, s.pct)}%` }}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-xs text-purple-400 mt-1.5">
+                    Avg:{' '}
+                    {Math.round(
+                      recentTrend.reduce((acc, s) => acc + s.pct, 0) / recentTrend.length
+                    )}
+                    % · {history.length} session{history.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+
+                {/* Weak areas */}
+                {weakAreas.length > 0 && (
+                  <div className="flex-1 min-w-[180px]">
+                    <p className="text-xs text-purple-300 font-semibold uppercase tracking-wider mb-2">
+                      ⚠️ Weak Areas
+                    </p>
+                    <div className="space-y-1">
+                      {weakAreas.map((area) => (
+                        <button
+                          key={area}
+                          onClick={() => {
+                            setSelectedSubtopics(new Set([area]));
+                            setSelectedDifficulties(new Set<Difficulty>(['Easy', 'Medium', 'Hard']));
+                          }}
+                          className="block w-full text-left text-xs px-2.5 py-1.5 rounded-lg bg-red-500/20 border border-red-500/30 text-red-200 hover:bg-red-500/30 transition-colors truncate"
+                        >
+                          {area}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-purple-400 mt-1.5">Tap to drill that topic</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="grid md:grid-cols-2 gap-6">
             {/* Left column — topics */}
@@ -454,7 +654,7 @@ export default function Home() {
             </div>
           </div>
         </div>
-        <p className="text-center text-purple-300/60 text-xs mt-8">
+        <p className="text-center text-purple-300/60 text-xs mt-8 pb-8">
           Mrs P Oremosu · Loxford School · <span className="font-mono">v{APP_VERSION}</span>
         </p>
       </div>
@@ -641,7 +841,26 @@ export default function Home() {
               {isLast ? 'Finish & See Results →' : 'Next Question →'}
             </button>
           </div>
-          <p className="text-center text-gray-600 text-xs mt-6">
+
+          {/* Keyboard shortcut hint */}
+          <p className="text-center text-gray-600 text-xs mt-4">
+            <kbd className="bg-gray-700/60 text-gray-400 px-1.5 py-0.5 rounded text-xs">A</kbd>{' '}
+            <kbd className="bg-gray-700/60 text-gray-400 px-1.5 py-0.5 rounded text-xs">B</kbd>{' '}
+            <kbd className="bg-gray-700/60 text-gray-400 px-1.5 py-0.5 rounded text-xs">C</kbd>{' '}
+            <kbd className="bg-gray-700/60 text-gray-400 px-1.5 py-0.5 rounded text-xs">D</kbd>{' '}
+            to answer
+            {answered && (
+              <>
+                {' '}·{' '}
+                <kbd className="bg-gray-700/60 text-gray-400 px-1.5 py-0.5 rounded text-xs">Enter</kbd>{' '}
+                or{' '}
+                <kbd className="bg-gray-700/60 text-gray-400 px-1.5 py-0.5 rounded text-xs">→</kbd>{' '}
+                to continue
+              </>
+            )}
+          </p>
+
+          <p className="text-center text-gray-600 text-xs mt-3">
             Mrs P Oremosu · Loxford School · <span className="font-mono">v{APP_VERSION}</span>
           </p>
         </div>
@@ -657,6 +876,9 @@ export default function Home() {
     const total = quiz.selectedQuestions.length;
     const timedOutCount = quiz.answers.filter((a) => a === -1).length;
     const pct = Math.round((score / total) * 100);
+    const wrongCount = quiz.answers.filter((a, i) => {
+      return a === null || a === -1 || a !== quiz.selectedQuestions[i].correctAnswer;
+    }).length;
 
     const grade =
       pct >= 90
@@ -675,10 +897,21 @@ export default function Home() {
       const a = quiz.answers[i];
       if (a !== null && a >= 0 && a === q.correctAnswer) subtopicStats[q.subtopic].correct++;
     });
-    // Sort weakest first
     const subtopicEntries = Object.entries(subtopicStats).sort(
       ([, a], [, b]) => a.correct / a.total - b.correct / b.total
     );
+
+    // Per-difficulty breakdown
+    const diffStats: Record<Difficulty, { correct: number; total: number }> = {
+      Easy: { correct: 0, total: 0 },
+      Medium: { correct: 0, total: 0 },
+      Hard: { correct: 0, total: 0 },
+    };
+    quiz.selectedQuestions.forEach((q, i) => {
+      diffStats[q.difficulty].total++;
+      const a = quiz.answers[i];
+      if (a !== null && a >= 0 && a === q.correctAnswer) diffStats[q.difficulty].correct++;
+    });
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
@@ -708,6 +941,23 @@ export default function Home() {
                 }`}
                 style={{ width: `${pct}%` }}
               />
+            </div>
+
+            {/* Difficulty breakdown badges */}
+            <div className="flex justify-center gap-3 mt-4 flex-wrap">
+              {(['Easy', 'Medium', 'Hard'] as Difficulty[]).map((d) => {
+                const s = diffStats[d];
+                if (s.total === 0) return null;
+                const dpct = Math.round((s.correct / s.total) * 100);
+                return (
+                  <span
+                    key={d}
+                    className={`text-xs px-3 py-1.5 rounded-full font-semibold ${DIFFICULTY_BADGE[d]} text-white`}
+                  >
+                    {d}: {s.correct}/{s.total} ({dpct}%)
+                  </span>
+                );
+              })}
             </div>
           </div>
 
@@ -741,69 +991,123 @@ export default function Home() {
             </div>
           )}
 
-          {/* Question review */}
-          <div className="space-y-4 mb-8">
-            <h2 className="text-lg font-semibold text-gray-300">Question Review</h2>
-            {quiz.selectedQuestions.map((q, i) => {
-              const ua = quiz.answers[i];
-              const isTO = ua === -1;
-              const correct = !isTO && ua === q.correctAnswer;
-              return (
-                <div
-                  key={q.id}
-                  className={`rounded-xl p-5 border ${
-                    isTO
-                      ? 'bg-orange-900/20 border-orange-700/50'
-                      : correct
-                      ? 'bg-green-900/20 border-green-700/50'
-                      : 'bg-red-900/20 border-red-700/50'
-                  }`}
+          {/* Question review — collapsible cards */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold text-gray-300">Question Review</h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={() =>
+                    setExpandedReviewCards(
+                      new Set(quiz.selectedQuestions.map((_, i) => i))
+                    )
+                  }
+                  className="text-xs text-purple-400 hover:text-purple-300 px-2 py-1 rounded hover:bg-white/5 transition-colors"
                 >
-                  <div className="flex items-start gap-3">
-                    <span className="text-xl mt-0.5">{isTO ? '⏰' : correct ? '✅' : '❌'}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap gap-2 mb-2">
-                        <span className="text-xs text-purple-400">{q.subtopic}</span>
-                        <span
-                          className={`text-xs font-semibold px-1.5 rounded ${DIFFICULTY_BADGE[q.difficulty]} text-white`}
-                        >
-                          {q.difficulty}
-                        </span>
+                  Expand all
+                </button>
+                <button
+                  onClick={() => setExpandedReviewCards(new Set())}
+                  className="text-xs text-gray-500 hover:text-gray-400 px-2 py-1 rounded hover:bg-white/5 transition-colors"
+                >
+                  Collapse all
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {quiz.selectedQuestions.map((q, i) => {
+                const ua = quiz.answers[i];
+                const isTO = ua === -1;
+                const correct = !isTO && ua === q.correctAnswer;
+                const expanded = expandedReviewCards.has(i);
+
+                return (
+                  <div
+                    key={q.id}
+                    className={`rounded-xl border overflow-hidden ${
+                      isTO
+                        ? 'bg-orange-900/20 border-orange-700/50'
+                        : correct
+                        ? 'bg-green-900/20 border-green-700/50'
+                        : 'bg-red-900/20 border-red-700/50'
+                    }`}
+                  >
+                    {/* Collapsed header — always visible */}
+                    <button
+                      onClick={() => toggleReviewCard(i)}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
+                    >
+                      <span className="text-base shrink-0">
+                        {isTO ? '⏰' : correct ? '✅' : '❌'}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap gap-1.5 items-center mb-0.5">
+                          <span className="text-xs text-purple-400 truncate max-w-[150px]">
+                            {q.subtopic}
+                          </span>
+                          <span
+                            className={`text-xs font-semibold px-1.5 py-0.5 rounded ${DIFFICULTY_BADGE[q.difficulty]} text-white`}
+                          >
+                            {q.difficulty}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-400 truncate">{q.question}</p>
                       </div>
-                      <p className="text-sm text-gray-200 mb-2">{q.question}</p>
-                      {isTO ? (
-                        <p className="text-xs text-orange-300 mb-1">⏰ Timed out</p>
-                      ) : !correct && ua !== null ? (
-                        <p className="text-xs text-red-300 mb-1">
-                          Your answer: {q.options[ua]}
+                      <span className="text-gray-600 text-xs shrink-0 ml-2">
+                        {expanded ? '▲' : '▼'}
+                      </span>
+                    </button>
+
+                    {/* Expanded body */}
+                    {expanded && (
+                      <div className="px-4 pb-4 pt-2 border-t border-white/5">
+                        <p className="text-sm text-gray-200 mb-3 leading-relaxed">{q.question}</p>
+                        {isTO ? (
+                          <p className="text-xs text-orange-300 mb-2">⏰ Timed out</p>
+                        ) : !correct && ua !== null ? (
+                          <p className="text-xs text-red-300 mb-2">
+                            Your answer: {q.options[ua]}
+                          </p>
+                        ) : null}
+                        <p className="text-xs text-green-300 mb-2">
+                          ✓ Correct: {q.options[q.correctAnswer]}
                         </p>
-                      ) : null}
-                      <p className="text-xs text-green-300 mb-2">
-                        Correct: {q.options[q.correctAnswer]}
-                      </p>
-                      <p className="text-xs text-gray-400 leading-relaxed">{q.explanation}</p>
-                    </div>
+                        <p className="text-xs text-gray-400 leading-relaxed">{q.explanation}</p>
+                      </div>
+                    )}
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
 
           {/* Actions */}
-          <div className="flex gap-4">
-            <button
-              onClick={resetToHome}
-              className="flex-1 py-3.5 rounded-2xl bg-white text-gray-900 font-bold hover:bg-gray-100 transition-colors text-sm"
-            >
-              🏠 Back to Home
-            </button>
-            <button
-              onClick={startQuiz}
-              className="flex-1 py-3.5 rounded-2xl bg-purple-600 hover:bg-purple-500 font-bold transition-colors text-sm"
-            >
-              🔄 Retry Same Settings
-            </button>
+          <div className="space-y-3">
+            <div className="flex gap-3">
+              <button
+                onClick={resetToHome}
+                className="flex-1 py-3.5 rounded-2xl bg-white text-gray-900 font-bold hover:bg-gray-100 transition-colors text-sm"
+              >
+                🏠 Back to Home
+              </button>
+              <button
+                onClick={startQuiz}
+                className="flex-1 py-3.5 rounded-2xl bg-purple-600 hover:bg-purple-500 font-bold transition-colors text-sm"
+              >
+                🔄 Retry Same Settings
+              </button>
+            </div>
+            {wrongCount > 0 && (
+              <button
+                onClick={retryWrongOnly}
+                className="w-full py-3.5 rounded-2xl bg-red-700 hover:bg-red-600 font-bold transition-colors text-sm"
+              >
+                ❌ Retry {wrongCount} Wrong Answer{wrongCount !== 1 ? 's' : ''} Only
+              </button>
+            )}
           </div>
+
           <p className="text-center text-gray-600 text-xs mt-6">
             Mrs P Oremosu · Loxford School · <span className="font-mono">v{APP_VERSION}</span>
           </p>
