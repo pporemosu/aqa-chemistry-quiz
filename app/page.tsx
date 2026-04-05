@@ -267,6 +267,11 @@ export default function Home() {
     window.scrollTo(0, 0);
   }
 
+  function clearHistory() {
+    try { localStorage.removeItem(HISTORY_KEY); } catch {}
+    setHistory([]);
+  }
+
   function retryWrongOnly() {
     if (!quiz) return;
     const wrongQuestions = quiz.selectedQuestions.filter((q, i) => {
@@ -392,9 +397,18 @@ export default function Home() {
               <div className="flex flex-wrap items-start gap-6">
                 {/* Score trend sparkline */}
                 <div className="flex-1 min-w-[140px]">
-                  <p className="text-xs text-purple-300 font-semibold uppercase tracking-wider mb-2">
-                    Recent Sessions
-                  </p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs text-purple-300 font-semibold uppercase tracking-wider">
+                      Recent Sessions
+                    </p>
+                    <button
+                      onClick={clearHistory}
+                      className="text-xs text-purple-400 hover:text-red-300 transition-colors px-2 py-0.5 rounded hover:bg-white/10"
+                      title="Clear all session history"
+                    >
+                      🗑 Clear
+                    </button>
+                  </div>
                   <div className="flex items-end gap-1 h-10">
                     {recentTrend.map((s, i) => (
                       <div
