@@ -24,7 +24,27 @@ interface SessionRecord {
   weakSubtopics: string[];
 }
 
+interface SavedSet {
+  id: string;
+  name: string;
+  subtopics: string[];
+  difficulties: Difficulty[];
+  count: number;
+  createdAt: string;
+}
+
+interface LessonPack {
+  name: string;
+  emoji: string;
+  description: string;
+  subtopics: string[]; // empty = all topics
+  count: number;
+  difficulties: Difficulty[];
+}
+
 const HISTORY_KEY = 'aqaChem_history';
+const SETS_KEY = 'aqaChem_sets';
+const THEME_KEY = 'aqaChem_theme';
 const MAX_HISTORY = 20;
 
 const DIFFICULTY_COLORS: Record<Difficulty, string> = {
@@ -38,6 +58,101 @@ const DIFFICULTY_BADGE: Record<Difficulty, string> = {
   Medium: 'bg-yellow-500',
   Hard: 'bg-red-500',
 };
+
+// ── Lesson starter packs ──
+const LESSON_PACKS: LessonPack[] = [
+  {
+    name: 'AS Physical Chemistry',
+    emoji: '⚛️',
+    description: 'Atomic structure, bonding, energetics, kinetics & equilibria',
+    subtopics: ['Atomic Structure', 'Amount of Substance', 'Bonding', 'Energetics', 'Kinetics', "Chemical Equilibria & Le Chatelier's", 'Redox'],
+    count: 10,
+    difficulties: ['Easy', 'Medium', 'Hard'],
+  },
+  {
+    name: 'A2 Physical Chemistry',
+    emoji: '🔬',
+    description: 'Thermodynamics, rate equations, Kp, electrochemistry & acids/bases',
+    subtopics: ['Thermodynamics', 'Rate Equations', 'Kp', 'Electrochemical Cells', 'Acids & Bases'],
+    count: 10,
+    difficulties: ['Easy', 'Medium', 'Hard'],
+  },
+  {
+    name: 'Inorganic Chemistry',
+    emoji: '🧪',
+    description: 'Period 3, Groups 2 & 7, transition metals & aqueous ions',
+    subtopics: ['Periodicity', 'Group 2', 'Group 7', 'Period 3 Oxides', 'Transition Metals', 'Reactions of Aqueous Ions'],
+    count: 10,
+    difficulties: ['Easy', 'Medium', 'Hard'],
+  },
+  {
+    name: 'Organic Chemistry AS',
+    emoji: '🔗',
+    description: 'Alkanes, halogenoalkanes, alkenes, alcohols & organic analysis',
+    subtopics: ['Introduction to Organic Chemistry', 'Alkanes', 'Halogenoalkanes', 'Alkenes', 'Alcohols', 'Organic Analysis'],
+    count: 10,
+    difficulties: ['Easy', 'Medium', 'Hard'],
+  },
+  {
+    name: 'Organic Chemistry A2',
+    emoji: '💊',
+    description: 'Carbonyls, carboxylic acids, aromatics, amines, polymers & synthesis',
+    subtopics: ['Optical Isomerism', 'Aldehydes & Ketones', 'Carboxylic Acids & Derivatives', 'Aromatic Chemistry', 'Amines', 'Polymers', 'Amino Acids, Proteins & DNA', 'Organic Synthesis'],
+    count: 10,
+    difficulties: ['Easy', 'Medium', 'Hard'],
+  },
+  {
+    name: 'Spectroscopy & Analysis',
+    emoji: '🔭',
+    description: 'NMR, chromatography, mass spec & organic identification',
+    subtopics: ['Organic Analysis', 'NMR Spectroscopy', 'Chromatography', 'Amino Acids, Proteins & DNA'],
+    count: 10,
+    difficulties: ['Easy', 'Medium', 'Hard'],
+  },
+  {
+    name: 'Required Practicals',
+    emoji: '⚗️',
+    description: 'All 12 AQA required practicals (RP1–RP12)',
+    subtopics: [
+      'RP1: Acid-Base Titration', 'RP2: Enthalpy Changes', 'RP3: Reaction Rates & Temperature',
+      'RP4: Inorganic Qualitative Analysis', 'RP5: Distillation', 'RP6: Organic Functional Group Tests',
+      'RP7: Measuring Rates of Reaction', 'RP8: Electrochemical Cells', 'RP9: Chromatography',
+      'RP10: Qualitative Organic Analysis', 'RP11: Preparation of Organic Solid', 'RP12: Transition Metal Complexes',
+    ],
+    count: 12,
+    difficulties: ['Easy', 'Medium', 'Hard'],
+  },
+  {
+    name: 'Calculation Focus',
+    emoji: '🔢',
+    description: 'Moles, energetics, rate equations, pH & electrochemistry — Medium/Hard only',
+    subtopics: ['Amount of Substance', 'Energetics', 'Thermodynamics', 'Rate Equations', 'Kp', 'Acids & Bases', 'Electrochemical Cells'],
+    count: 10,
+    difficulties: ['Medium', 'Hard'],
+  },
+  {
+    name: 'Mechanisms & Reactions',
+    emoji: '⚡',
+    description: 'Reaction mechanisms across all of organic chemistry',
+    subtopics: ['Halogenoalkanes', 'Alkenes', 'Alcohols', 'Aldehydes & Ketones', 'Carboxylic Acids & Derivatives', 'Aromatic Chemistry', 'Amines'],
+    count: 10,
+    difficulties: ['Easy', 'Medium', 'Hard'],
+  },
+  {
+    name: 'Full Mixed Paper',
+    emoji: '📝',
+    description: 'Random questions from all 46 subtopics — like a mock exam',
+    subtopics: [],
+    count: 20,
+    difficulties: ['Easy', 'Medium', 'Hard'],
+  },
+];
+
+// Split explanation text into step-through sentences
+function splitExplanation(text: string): string[] {
+  const parts = text.replace(/([.!?])\s+/g, '$1\u0000').split('\u0000');
+  return parts.map((s) => s.trim()).filter((s) => s.length > 0);
+}
 
 // Round-robin across subtopics so questions don't cluster by topic
 function distributedShuffle(pool: Question[], count: number): Question[] {
@@ -54,9 +169,7 @@ function distributedShuffle(pool: Question[], count: number): Question[] {
   let i = 0;
   while (result.length < count) {
     const key = keys[i % keys.length];
-    if (groups[key].length > 0) {
-      result.push(groups[key].shift()!);
-    }
+    if (groups[key].length > 0) result.push(groups[key].shift()!);
     i++;
     if (keys.every((k) => groups[k].length === 0)) break;
   }
@@ -66,25 +179,39 @@ function distributedShuffle(pool: Question[], count: number): Question[] {
 export default function Home() {
   const [screen, setScreen] = useState<Screen>('home');
 
-  // ── Home screen settings ──
+  // ── Home settings ──
   const [selectedSubtopics, setSelectedSubtopics] = useState<Set<string>>(new Set());
   const [selectedDifficulties, setSelectedDifficulties] = useState<Set<Difficulty>>(
     new Set<Difficulty>(['Easy', 'Medium', 'Hard'])
   );
   const [questionCount, setQuestionCount] = useState(10);
   const [topicsExpanded, setTopicsExpanded] = useState(true);
+  const [lessonPacksExpanded, setLessonPacksExpanded] = useState(false);
+  const [savedSetsExpanded, setSavedSetsExpanded] = useState(false);
 
-  // ── Timer settings ──
+  // ── Timer ──
   const [timerEnabled, setTimerEnabled] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(60);
   const [timeLeft, setTimeLeft] = useState(0);
 
-  // ── Quiz state ──
+  // ── Quiz ──
   const [quiz, setQuiz] = useState<QuizState | null>(null);
 
-  // ── Session history (localStorage) ──
+  // ── UI modes (12: light mode, 1: presentation mode) ──
+  const [lightMode, setLightMode] = useState(false);
+  const [presentationMode, setPresentationMode] = useState(false);
+
+  // ── Feature 9: worked explanation step-through ──
+  const [explanationStep, setExplanationStep] = useState(0);
+
+  // ── Session history ──
   const [history, setHistory] = useState<SessionRecord[]>([]);
   const savedSession = useRef(false);
+
+  // ── Feature 10: saved sets ──
+  const [savedSets, setSavedSets] = useState<SavedSet[]>([]);
+  const [saveSetName, setSaveSetName] = useState('');
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
 
   // ── Collapsible review cards ──
   const [expandedReviewCards, setExpandedReviewCards] = useState<Set<number>>(new Set());
@@ -99,22 +226,25 @@ export default function Home() {
 
   const sliderMax = Math.min(50, availableCount);
 
-  // ── Load history from localStorage on mount ──
+  // ── Load persisted state on mount ──
   useEffect(() => {
     try {
       const stored = localStorage.getItem(HISTORY_KEY);
       if (stored) setHistory(JSON.parse(stored));
+    } catch {}
+    try {
+      const storedSets = localStorage.getItem(SETS_KEY);
+      if (storedSets) setSavedSets(JSON.parse(storedSets));
+    } catch {}
+    try {
+      if (localStorage.getItem(THEME_KEY) === 'light') setLightMode(true);
     } catch {}
   }, []);
 
   // ── Timer effect ──
   useEffect(() => {
     if (!timerEnabled || screen !== 'quiz' || !quiz) return;
-    if (quiz.revealed[quiz.currentIndex]) {
-      setTimeLeft(0);
-      return;
-    }
-
+    if (quiz.revealed[quiz.currentIndex]) { setTimeLeft(0); return; }
     setTimeLeft(timerSeconds);
     const interval = setInterval(() => {
       setTimeLeft((prev) => {
@@ -124,17 +254,16 @@ export default function Home() {
             if (!q || q.revealed[q.currentIndex]) return q;
             const answers = [...q.answers];
             const revealed = [...q.revealed];
-            answers[q.currentIndex] = -1; // -1 = timed out
+            answers[q.currentIndex] = -1;
             revealed[q.currentIndex] = true;
-            const maxRevealedIndex = Math.max(q.maxRevealedIndex, q.currentIndex);
-            return { ...q, answers, revealed, maxRevealedIndex };
+            return { ...q, answers, revealed, maxRevealedIndex: Math.max(q.maxRevealedIndex, q.currentIndex) };
           });
+          setExplanationStep(1);
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
-
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quiz?.currentIndex, screen, timerEnabled, timerSeconds]);
@@ -144,41 +273,27 @@ export default function Home() {
     if (screen !== 'quiz' || !quiz) return;
     const currentQ = quiz.selectedQuestions[quiz.currentIndex];
     if (!currentQ) return;
-
     function handleKey(e: KeyboardEvent) {
       if (!quiz) return;
       if ((e.target as HTMLElement).tagName === 'INPUT') return;
       const answered = quiz.revealed[quiz.currentIndex];
-
       if (!answered) {
         const keyMap: Record<string, number> = { a: 0, b: 1, c: 2, d: 3 };
         const k = e.key.toLowerCase();
-        if (k in keyMap && keyMap[k] < currentQ.options.length) {
-          e.preventDefault();
-          handleAnswer(keyMap[k]);
-          return;
-        }
+        if (k in keyMap && keyMap[k] < currentQ.options.length) { e.preventDefault(); handleAnswer(keyMap[k]); return; }
       }
-      if (answered && (e.key === 'Enter' || e.key === 'ArrowRight')) {
-        e.preventDefault();
-        goNext();
-      }
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        goBack();
-      }
+      if (answered && (e.key === 'Enter' || e.key === 'ArrowRight')) { e.preventDefault(); goNext(); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); goBack(); }
     }
-
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen, quiz?.currentIndex, quiz?.revealed]);
 
-  // ── Save session when results screen opens ──
+  // ── Save session on results ──
   useEffect(() => {
     if (screen !== 'results' || !quiz || savedSession.current) return;
     savedSession.current = true;
-
     const subtopicStats: Record<string, { correct: number; total: number }> = {};
     quiz.selectedQuestions.forEach((q, i) => {
       if (!subtopicStats[q.subtopic]) subtopicStats[q.subtopic] = { correct: 0, total: 0 };
@@ -186,15 +301,12 @@ export default function Home() {
       const a = quiz.answers[i];
       if (a !== null && a >= 0 && a === q.correctAnswer) subtopicStats[q.subtopic].correct++;
     });
-
     const weakSubtopics = Object.entries(subtopicStats)
       .filter(([, s]) => s.total > 0 && s.correct / s.total < 0.6)
       .map(([name]) => name);
-
     const currentScore = quiz.answers.filter(
       (a, i) => a !== null && a >= 0 && a === quiz.selectedQuestions[i].correctAnswer
     ).length;
-
     const record: SessionRecord = {
       date: new Date().toISOString(),
       score: currentScore,
@@ -202,7 +314,6 @@ export default function Home() {
       pct: Math.round((currentScore / quiz.selectedQuestions.length) * 100),
       weakSubtopics,
     };
-
     setHistory((prev) => {
       const updated = [record, ...prev].slice(0, MAX_HISTORY);
       try { localStorage.setItem(HISTORY_KEY, JSON.stringify(updated)); } catch {}
@@ -212,20 +323,32 @@ export default function Home() {
   }, [screen]);
 
   // ── Helpers ──
-  function toggleSubtopic(sub: string) {
-    setSelectedSubtopics((prev) => {
-      const next = new Set(prev);
-      next.has(sub) ? next.delete(sub) : next.add(sub);
+
+  // Feature 12: light mode toggle
+  function toggleLightMode() {
+    setLightMode((v) => {
+      const next = !v;
+      try { localStorage.setItem(THEME_KEY, next ? 'light' : 'dark'); } catch {}
       return next;
     });
   }
 
+  // Feature 1: presentation mode toggle (also requests fullscreen)
+  async function togglePresentationMode() {
+    const next = !presentationMode;
+    setPresentationMode(next);
+    try {
+      if (next) { await document.documentElement.requestFullscreen(); }
+      else { if (document.fullscreenElement) await document.exitFullscreen(); }
+    } catch {}
+  }
+
+  function toggleSubtopic(sub: string) {
+    setSelectedSubtopics((prev) => { const next = new Set(prev); next.has(sub) ? next.delete(sub) : next.add(sub); return next; });
+  }
+
   function toggleDifficulty(d: Difficulty) {
-    setSelectedDifficulties((prev) => {
-      const next = new Set(prev);
-      next.has(d) ? next.delete(d) : next.add(d);
-      return next;
-    });
+    setSelectedDifficulties((prev) => { const next = new Set(prev); next.has(d) ? next.delete(d) : next.add(d); return next; });
   }
 
   function toggleCategory(category: string) {
@@ -238,12 +361,52 @@ export default function Home() {
     });
   }
 
-  function selectAll() {
-    setSelectedSubtopics(new Set(TOPICS.flatMap((t) => t.subtopics)));
+  function selectAll() { setSelectedSubtopics(new Set(TOPICS.flatMap((t) => t.subtopics))); }
+  function clearAll() { setSelectedSubtopics(new Set()); }
+
+  // Feature 6: load a lesson pack
+  function loadLessonPack(pack: LessonPack) {
+    setSelectedSubtopics(pack.subtopics.length > 0 ? new Set(pack.subtopics) : new Set());
+    setSelectedDifficulties(new Set<Difficulty>(pack.difficulties));
+    setQuestionCount(pack.count);
+    setLessonPacksExpanded(false);
+    window.scrollTo(0, 0);
   }
 
-  function clearAll() {
-    setSelectedSubtopics(new Set());
+  // Feature 10: saved sets
+  function saveCurrentSet() {
+    if (!saveSetName.trim()) return;
+    const newSet: SavedSet = {
+      id: Date.now().toString(),
+      name: saveSetName.trim(),
+      subtopics: [...selectedSubtopics],
+      difficulties: [...selectedDifficulties] as Difficulty[],
+      count: questionCount,
+      createdAt: new Date().toISOString(),
+    };
+    setSavedSets((prev) => {
+      const updated = [newSet, ...prev];
+      try { localStorage.setItem(SETS_KEY, JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+    setSaveSetName('');
+    setShowSaveDialog(false);
+  }
+
+  function loadSet(set: SavedSet) {
+    setSelectedSubtopics(set.subtopics.length > 0 ? new Set(set.subtopics) : new Set());
+    setSelectedDifficulties(new Set<Difficulty>(set.difficulties));
+    setQuestionCount(set.count);
+    setSavedSetsExpanded(false);
+    window.scrollTo(0, 0);
+  }
+
+  function deleteSet(id: string) {
+    setSavedSets((prev) => {
+      const updated = prev.filter((s) => s.id !== id);
+      try { localStorage.setItem(SETS_KEY, JSON.stringify(updated)); } catch {}
+      return updated;
+    });
   }
 
   function startQuiz() {
@@ -256,6 +419,7 @@ export default function Home() {
     const selected = distributedShuffle(pool, count);
     savedSession.current = false;
     setExpandedReviewCards(new Set());
+    setExplanationStep(0);
     setQuiz({
       selectedQuestions: selected,
       currentIndex: 0,
@@ -281,6 +445,7 @@ export default function Home() {
     if (wrongQuestions.length === 0) return;
     savedSession.current = false;
     setExpandedReviewCards(new Set());
+    setExplanationStep(0);
     setQuiz({
       selectedQuestions: wrongQuestions,
       currentIndex: 0,
@@ -295,19 +460,20 @@ export default function Home() {
   function handleAnswer(optionIndex: number) {
     if (!quiz) return;
     if (quiz.revealed[quiz.currentIndex]) return;
+    setExplanationStep(1); // start step-through at sentence 1
     setQuiz((prev) => {
       if (!prev) return prev;
       const answers = [...prev.answers];
       const revealed = [...prev.revealed];
       answers[prev.currentIndex] = optionIndex;
       revealed[prev.currentIndex] = true;
-      const maxRevealedIndex = Math.max(prev.maxRevealedIndex, prev.currentIndex);
-      return { ...prev, answers, revealed, maxRevealedIndex };
+      return { ...prev, answers, revealed, maxRevealedIndex: Math.max(prev.maxRevealedIndex, prev.currentIndex) };
     });
   }
 
   function goNext() {
     if (!quiz) return;
+    setExplanationStep(0);
     if (quiz.currentIndex >= quiz.selectedQuestions.length - 1) {
       setScreen('results');
     } else {
@@ -323,6 +489,7 @@ export default function Home() {
 
   function goBack() {
     if (!quiz || quiz.currentIndex === 0) return;
+    setExplanationStep(0);
     setQuiz((prev) => prev && { ...prev, currentIndex: prev.currentIndex - 1 });
     window.scrollTo(0, 0);
   }
@@ -331,39 +498,141 @@ export default function Home() {
     setScreen('home');
     setQuiz(null);
     setExpandedReviewCards(new Set());
+    setExplanationStep(0);
     window.scrollTo(0, 0);
   }
 
   function toggleReviewCard(index: number) {
-    setExpandedReviewCards((prev) => {
-      const next = new Set(prev);
-      next.has(index) ? next.delete(index) : next.add(index);
-      return next;
-    });
+    setExpandedReviewCards((prev) => { const next = new Set(prev); next.has(index) ? next.delete(index) : next.add(index); return next; });
   }
 
   // ── Score ──
   const score = useMemo(() => {
     if (!quiz) return 0;
-    return quiz.answers.filter(
-      (a, i) => a !== null && a >= 0 && a === quiz.selectedQuestions[i].correctAnswer
-    ).length;
+    return quiz.answers.filter((a, i) => a !== null && a >= 0 && a === quiz.selectedQuestions[i].correctAnswer).length;
   }, [quiz]);
 
-  // ── Weak areas derived from session history (last 10 sessions) ──
+  // ── Weak areas ──
   const weakAreas = useMemo(() => {
     if (history.length === 0) return [];
     const counts: Record<string, number> = {};
-    history.slice(0, 10).forEach((s) => {
-      s.weakSubtopics.forEach((t) => { counts[t] = (counts[t] ?? 0) + 1; });
-    });
-    return Object.entries(counts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([name]) => name);
+    history.slice(0, 10).forEach((s) => { s.weakSubtopics.forEach((t) => { counts[t] = (counts[t] ?? 0) + 1; }); });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name]) => name);
   }, [history]);
 
   const recentTrend = history.slice(0, 10).reverse();
+
+  // ── Theme objects ──
+
+  // Home screen theme (Feature 12)
+  const H = {
+    page: lightMode
+      ? 'from-purple-50 via-white to-indigo-50 text-purple-950'
+      : 'from-purple-900 via-purple-800 to-indigo-900 text-white',
+    badge: lightMode ? 'bg-purple-100 text-purple-700' : 'bg-white/10 text-purple-200',
+    card: lightMode ? 'bg-white shadow-sm border border-purple-100' : 'bg-white/10 backdrop-blur',
+    label: lightMode ? 'text-purple-700' : 'text-purple-200',
+    muted: lightMode ? 'text-purple-500' : 'text-purple-300',
+    veryMuted: lightMode ? 'text-purple-400' : 'text-purple-400',
+    btnToggle: lightMode
+      ? 'text-purple-600 hover:text-purple-900 hover:bg-purple-100'
+      : 'text-purple-300 hover:text-white hover:bg-white/10',
+    btnSelectAll: lightMode ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-purple-500/40 hover:bg-purple-500/60',
+    btnClear: lightMode ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-white/10 hover:bg-white/20',
+    catActive: lightMode ? 'bg-purple-200 text-purple-900' : 'bg-purple-500/50 text-white',
+    catPartial: lightMode ? 'bg-purple-100 text-purple-800' : 'bg-purple-500/30 text-white',
+    catInactive: lightMode ? 'text-purple-800 hover:bg-purple-50' : 'bg-white/5 hover:bg-white/10 text-white',
+    subActive: lightMode ? 'bg-purple-100 text-purple-900' : 'bg-purple-400/40 text-white',
+    subInactive: lightMode ? 'text-purple-700 hover:bg-purple-50' : 'text-purple-200 hover:bg-white/10',
+    diffActive: (d: Difficulty) => selectedDifficulties.has(d) ? DIFFICULTY_COLORS[d] + ' border-current scale-105' : (lightMode ? 'bg-gray-100 border-gray-300 text-gray-400' : 'bg-white/5 border-white/20 text-white/50'),
+    histCard: lightMode ? 'bg-purple-50 border border-purple-100' : 'bg-white/10 backdrop-blur',
+    weakBtn: lightMode ? 'bg-red-50 border border-red-200 text-red-700 hover:bg-red-100' : 'bg-red-500/20 border border-red-500/30 text-red-200 hover:bg-red-500/30',
+    clearBtn: lightMode ? 'text-purple-500 hover:text-red-500 hover:bg-red-50' : 'text-purple-400 hover:text-red-300 hover:bg-white/10',
+    packCard: lightMode ? 'bg-purple-50 border border-purple-100 hover:bg-purple-100 text-purple-900' : 'bg-white/5 border border-white/10 hover:bg-white/15 text-white',
+    packDesc: lightMode ? 'text-purple-600' : 'text-purple-300',
+    savedCard: lightMode ? 'bg-gray-50 border border-gray-200 text-gray-800' : 'bg-white/5 border border-white/10 text-white',
+    savedMeta: lightMode ? 'text-gray-500' : 'text-gray-400',
+    loadBtn: lightMode ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-purple-500 hover:bg-purple-400 text-white',
+    deleteBtn: lightMode ? 'text-red-400 hover:text-red-600 hover:bg-red-50' : 'text-red-400/60 hover:text-red-300 hover:bg-red-900/20',
+    input: lightMode ? 'bg-white border border-purple-200 text-purple-900 placeholder-purple-300 focus:border-purple-500' : 'bg-white/10 border border-white/20 text-white placeholder-purple-400 focus:border-purple-400',
+    startBtn: lightMode ? 'bg-purple-700 text-white hover:bg-purple-800' : 'bg-white text-purple-900 hover:bg-purple-100',
+    summaryText: lightMode ? 'text-purple-600' : 'text-purple-200',
+    summaryVal: lightMode ? 'text-purple-900' : 'text-white',
+    timerToggle: (on: boolean) => on ? 'bg-purple-500' : (lightMode ? 'bg-gray-300' : 'bg-gray-600'),
+    timerBtn: (active: boolean) => active
+      ? 'bg-purple-500 text-white'
+      : (lightMode ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-white/10 text-purple-200 hover:bg-white/20'),
+    footer: lightMode ? 'text-purple-400' : 'text-purple-300/60',
+    saveDialogBg: lightMode ? 'bg-purple-50 border border-purple-200' : 'bg-white/10 border border-white/20',
+  };
+
+  // Quiz / Results screen theme (Feature 12)
+  const Q = {
+    page: lightMode
+      ? 'from-gray-50 via-white to-gray-100 text-gray-900'
+      : 'from-gray-900 via-gray-800 to-gray-900 text-white',
+    card: lightMode ? 'bg-white shadow border border-gray-100' : 'bg-gray-800',
+    homeBtn: lightMode ? 'text-gray-500 hover:text-gray-800' : 'text-gray-400 hover:text-white',
+    scoreBadge: lightMode ? 'text-green-600' : 'text-green-400',
+    counter: lightMode ? 'text-gray-500' : 'text-gray-400',
+    progBg: lightMode ? 'bg-gray-200' : 'bg-gray-700',
+    reviewBanner: lightMode
+      ? 'bg-yellow-50 border border-yellow-200 text-yellow-800'
+      : 'bg-yellow-900/30 border border-yellow-600/50 text-yellow-300',
+    topicTag: lightMode ? 'bg-purple-100 text-purple-700' : 'bg-purple-900/60 text-purple-300',
+    subtopicTag: lightMode ? 'bg-gray-100 text-gray-600' : 'bg-gray-700 text-gray-300',
+    questionText: lightMode ? 'text-gray-900' : 'text-white',
+    optUnanswered: lightMode
+      ? 'border-gray-300 bg-white hover:bg-gray-50 hover:border-purple-400 text-gray-800 cursor-pointer'
+      : 'border-gray-600 bg-gray-700/50 hover:bg-gray-700 hover:border-purple-500 text-white cursor-pointer',
+    optCorrect: lightMode ? 'border-green-500 bg-green-50 text-green-800' : 'border-green-500 bg-green-900/30 text-green-300',
+    optWrong: lightMode ? 'border-red-500 bg-red-50 text-red-800' : 'border-red-500 bg-red-900/30 text-red-300',
+    optDim: lightMode ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-default' : 'border-gray-600 bg-gray-700/30 text-gray-500 cursor-default',
+    optLetter: lightMode ? 'text-gray-400' : 'text-gray-400',
+    expCorrect: lightMode ? 'bg-green-50 border-green-300 text-green-900' : 'bg-green-900/20 border-green-700 text-green-200',
+    expWrong: lightMode ? 'bg-red-50 border-red-300 text-red-900' : 'bg-red-900/20 border-red-700 text-red-200',
+    expTimeout: lightMode ? 'bg-orange-50 border-orange-300 text-orange-900' : 'bg-orange-900/20 border-orange-700 text-orange-200',
+    stepBtn: lightMode ? 'bg-purple-100 hover:bg-purple-200 text-purple-800' : 'bg-white/20 hover:bg-white/30 text-white',
+    navBack: lightMode
+      ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed'
+      : 'bg-gray-700 text-gray-300 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed',
+    navNext: lightMode
+      ? 'bg-purple-700 hover:bg-purple-800 text-white disabled:opacity-30 disabled:cursor-not-allowed'
+      : 'bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-30 disabled:cursor-not-allowed',
+    kbd: lightMode ? 'bg-gray-100 border border-gray-300 text-gray-500' : 'bg-gray-700/60 text-gray-400',
+    kbdText: lightMode ? 'text-gray-400' : 'text-gray-600',
+    footer: lightMode ? 'text-gray-400' : 'text-gray-600',
+    // Results
+    h2: lightMode ? 'text-gray-700' : 'text-gray-300',
+    subBar: lightMode ? 'bg-gray-200' : 'bg-gray-700',
+    subText: lightMode ? 'text-gray-700' : 'text-gray-300',
+    subCount: lightMode ? 'text-gray-500' : 'text-gray-400',
+    reviewCorrect: lightMode ? 'bg-green-50 border-green-200' : 'bg-green-900/20 border-green-700/50',
+    reviewWrong: lightMode ? 'bg-red-50 border-red-200' : 'bg-red-900/20 border-red-700/50',
+    reviewTimeout: lightMode ? 'bg-orange-50 border-orange-200' : 'bg-orange-900/20 border-orange-700/50',
+    reviewHeader: lightMode ? 'hover:bg-gray-50' : 'hover:bg-white/5',
+    reviewDivider: lightMode ? 'border-gray-100' : 'border-white/5',
+    reviewBody: lightMode ? 'text-gray-800' : 'text-gray-200',
+    reviewMuted: lightMode ? 'text-gray-500' : 'text-gray-400',
+    reviewSubtopic: lightMode ? 'text-purple-600' : 'text-purple-400',
+    reviewChevron: lightMode ? 'text-gray-400' : 'text-gray-600',
+    backHome: lightMode ? 'bg-gray-800 text-white hover:bg-gray-700' : 'bg-white text-gray-900 hover:bg-gray-100',
+    retry: lightMode ? 'bg-purple-700 hover:bg-purple-800 text-white' : 'bg-purple-600 hover:bg-purple-500 text-white',
+    retryWrong: lightMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-700 hover:bg-red-600 text-white',
+    pct: lightMode ? 'text-gray-600' : 'text-gray-400',
+    timeout: lightMode ? 'text-orange-500' : 'text-orange-400',
+  };
+
+  // Presentation mode sizes (Feature 1)
+  const P = {
+    questionText: presentationMode ? 'text-2xl md:text-3xl leading-relaxed' : 'text-lg font-medium leading-relaxed',
+    optionPad: presentationMode ? 'py-5 px-6' : 'py-3.5 px-4',
+    optionText: presentationMode ? 'text-lg' : 'text-sm font-medium',
+    optionLetter: presentationMode ? 'text-xl w-8' : 'text-sm w-6',
+    meta: presentationMode ? 'text-sm px-3.5 py-1.5' : 'text-xs px-2.5 py-1',
+    exp: presentationMode ? 'text-base leading-relaxed' : 'text-sm leading-relaxed',
+    counter: presentationMode ? 'text-xl' : 'text-sm',
+  };
 
   // ── Render ──
   if (screen === 'home') return <HomeScreen />;
@@ -376,36 +645,34 @@ export default function Home() {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   function HomeScreen() {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-800 to-indigo-900 text-white">
+      <div className={`min-h-screen bg-gradient-to-br ${H.page}`}>
         <div className="max-w-4xl mx-auto px-4 py-10">
+
           {/* Header */}
-          <div className="text-center mb-10">
-            <div className="inline-block bg-white/10 backdrop-blur rounded-2xl px-6 py-2 mb-4 text-sm font-medium tracking-widest uppercase text-purple-200">
+          <div className="text-center mb-10 relative">
+            {/* Light/dark toggle — top right */}
+            <button
+              onClick={toggleLightMode}
+              title={lightMode ? 'Switch to dark mode' : 'Switch to light mode'}
+              className={`absolute right-0 top-0 text-xl px-2 py-1 rounded-lg transition-colors ${H.btnToggle}`}
+            >
+              {lightMode ? '🌙' : '☀️'}
+            </button>
+            <div className={`inline-block rounded-2xl px-6 py-2 mb-4 text-sm font-medium tracking-widest uppercase ${H.badge}`}>
               AQA 7404 / 7405
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold mb-3">
-              A-Level Chemistry Quiz
-            </h1>
-            <p className="text-purple-200 text-lg">
-              Test yourself on every topic from the AQA specification
-            </p>
+            <h1 className="text-4xl md:text-5xl font-bold mb-3">A-Level Chemistry Quiz</h1>
+            <p className={`text-lg ${H.muted}`}>Test yourself on every topic from the AQA specification</p>
           </div>
 
-          {/* Session history / progress panel */}
+          {/* Session history panel */}
           {history.length > 0 && (
-            <div className="bg-white/10 backdrop-blur rounded-2xl p-5 mb-6">
+            <div className={`rounded-2xl p-5 mb-4 ${H.histCard}`}>
               <div className="flex flex-wrap items-start gap-6">
-                {/* Score trend sparkline */}
                 <div className="flex-1 min-w-[140px]">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs text-purple-300 font-semibold uppercase tracking-wider">
-                      Recent Sessions
-                    </p>
-                    <button
-                      onClick={clearHistory}
-                      className="text-xs text-purple-400 hover:text-red-300 transition-colors px-2 py-0.5 rounded hover:bg-white/10"
-                      title="Clear all session history"
-                    >
+                    <p className={`text-xs font-semibold uppercase tracking-wider ${H.muted}`}>Recent Sessions</p>
+                    <button onClick={clearHistory} className={`text-xs px-2 py-0.5 rounded transition-colors ${H.clearBtn}`} title="Clear all session history">
                       🗑 Clear
                     </button>
                   </div>
@@ -414,86 +681,124 @@ export default function Home() {
                       <div
                         key={i}
                         title={`${s.pct}% · ${new Date(s.date).toLocaleDateString()}`}
-                        className={`flex-1 rounded-sm ${
-                          s.pct >= 70 ? 'bg-green-400' : s.pct >= 50 ? 'bg-yellow-400' : 'bg-red-400'
-                        }`}
+                        className={`flex-1 rounded-sm ${s.pct >= 70 ? 'bg-green-400' : s.pct >= 50 ? 'bg-yellow-400' : 'bg-red-400'}`}
                         style={{ height: `${Math.max(12, s.pct)}%` }}
                       />
                     ))}
                   </div>
-                  <p className="text-xs text-purple-400 mt-1.5">
-                    Avg:{' '}
-                    {Math.round(
-                      recentTrend.reduce((acc, s) => acc + s.pct, 0) / recentTrend.length
-                    )}
-                    % · {history.length} session{history.length !== 1 ? 's' : ''}
+                  <p className={`text-xs mt-1.5 ${H.veryMuted}`}>
+                    Avg: {Math.round(recentTrend.reduce((acc, s) => acc + s.pct, 0) / recentTrend.length)}% · {history.length} session{history.length !== 1 ? 's' : ''}
                   </p>
                 </div>
-
-                {/* Weak areas */}
                 {weakAreas.length > 0 && (
                   <div className="flex-1 min-w-[180px]">
-                    <p className="text-xs text-purple-300 font-semibold uppercase tracking-wider mb-2">
-                      ⚠️ Weak Areas
-                    </p>
+                    <p className={`text-xs font-semibold uppercase tracking-wider mb-2 ${H.muted}`}>⚠️ Weak Areas</p>
                     <div className="space-y-1">
                       {weakAreas.map((area) => (
                         <button
                           key={area}
-                          onClick={() => {
-                            setSelectedSubtopics(new Set([area]));
-                            setSelectedDifficulties(new Set<Difficulty>(['Easy', 'Medium', 'Hard']));
-                          }}
-                          className="block w-full text-left text-xs px-2.5 py-1.5 rounded-lg bg-red-500/20 border border-red-500/30 text-red-200 hover:bg-red-500/30 transition-colors truncate"
+                          onClick={() => { setSelectedSubtopics(new Set([area])); setSelectedDifficulties(new Set<Difficulty>(['Easy', 'Medium', 'Hard'])); }}
+                          className={`block w-full text-left text-xs px-2.5 py-1.5 rounded-lg transition-colors truncate ${H.weakBtn}`}
                         >
                           {area}
                         </button>
                       ))}
                     </div>
-                    <p className="text-xs text-purple-400 mt-1.5">Tap to drill that topic</p>
+                    <p className={`text-xs mt-1.5 ${H.veryMuted}`}>Tap to drill that topic</p>
                   </div>
                 )}
               </div>
             </div>
           )}
 
+          {/* ── Feature 6: Lesson Starter Packs ── */}
+          <div className={`rounded-2xl mb-4 overflow-hidden ${H.card}`}>
+            <button
+              onClick={() => setLessonPacksExpanded((v) => !v)}
+              className={`w-full flex items-center justify-between px-6 py-4 transition-colors ${H.btnToggle}`}
+            >
+              <span className="font-semibold flex items-center gap-2">
+                <span className="text-xl">🚀</span> Lesson Starter Packs
+              </span>
+              <span className="text-xs">{lessonPacksExpanded ? '▲ Collapse' : '▼ Expand'}</span>
+            </button>
+            {lessonPacksExpanded && (
+              <div className="px-6 pb-5">
+                <p className={`text-xs mb-3 ${H.muted}`}>One click to load a curated topic set — then hit Start Quiz</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {LESSON_PACKS.map((pack) => (
+                    <button
+                      key={pack.name}
+                      onClick={() => loadLessonPack(pack)}
+                      className={`text-left rounded-xl px-4 py-3 transition-all border text-sm ${H.packCard}`}
+                    >
+                      <div className="font-semibold mb-0.5">
+                        {pack.emoji} {pack.name}
+                        <span className={`ml-2 text-xs font-normal ${H.packDesc}`}>({pack.count}Q)</span>
+                      </div>
+                      <div className={`text-xs ${H.packDesc}`}>{pack.description}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Feature 10: Saved Sets ── */}
+          {(savedSets.length > 0 || showSaveDialog) && (
+            <div className={`rounded-2xl mb-4 overflow-hidden ${H.card}`}>
+              <button
+                onClick={() => setSavedSetsExpanded((v) => !v)}
+                className={`w-full flex items-center justify-between px-6 py-4 transition-colors ${H.btnToggle}`}
+              >
+                <span className="font-semibold flex items-center gap-2">
+                  <span className="text-xl">💾</span> Saved Sets
+                  <span className={`text-xs font-normal ${H.muted}`}>({savedSets.length} saved)</span>
+                </span>
+                <span className="text-xs">{savedSetsExpanded ? '▲ Collapse' : '▼ Expand'}</span>
+              </button>
+              {savedSetsExpanded && savedSets.length > 0 && (
+                <div className="px-6 pb-5 space-y-2">
+                  {savedSets.map((set) => (
+                    <div key={set.id} className={`flex items-center gap-3 rounded-xl px-4 py-3 border ${H.savedCard}`}>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate">{set.name}</p>
+                        <p className={`text-xs truncate ${H.savedMeta}`}>
+                          {set.subtopics.length === 0 ? 'All topics' : `${set.subtopics.length} subtopics`} · {set.difficulties.join(', ')} · {set.count}Q
+                        </p>
+                      </div>
+                      <button onClick={() => loadSet(set)} className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors shrink-0 ${H.loadBtn}`}>
+                        Load
+                      </button>
+                      <button onClick={() => deleteSet(set.id)} className={`text-xs px-2 py-1.5 rounded-lg transition-colors shrink-0 ${H.deleteBtn}`} title="Delete">
+                        🗑
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Main 2-column grid */}
           <div className="grid md:grid-cols-2 gap-6">
-            {/* Left column — topics */}
-            <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
+            {/* Left — topics */}
+            <div className={`rounded-2xl p-6 ${H.card}`}>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-lg font-semibold flex items-center gap-2">
                   <span className="text-2xl">📚</span> Select Topics
                 </h2>
-                <button
-                  onClick={() => setTopicsExpanded((v) => !v)}
-                  className="text-xs text-purple-300 hover:text-white transition-colors px-2 py-1 rounded hover:bg-white/10"
-                >
+                <button onClick={() => setTopicsExpanded((v) => !v)} className={`text-xs px-2 py-1 rounded transition-colors ${H.btnToggle}`}>
                   {topicsExpanded ? '▲ Collapse' : '▼ Expand'}
                 </button>
               </div>
-
-              <p className="text-xs text-purple-300 mb-3">
-                {selectedSubtopics.size === 0
-                  ? '✅ All topics included'
-                  : `${selectedSubtopics.size} subtopic${selectedSubtopics.size !== 1 ? 's' : ''} selected`}
+              <p className={`text-xs mb-3 ${H.muted}`}>
+                {selectedSubtopics.size === 0 ? '✅ All topics included' : `${selectedSubtopics.size} subtopic${selectedSubtopics.size !== 1 ? 's' : ''} selected`}
               </p>
-
-              {/* Select All / Clear All */}
               <div className="flex gap-2 mb-3">
-                <button
-                  onClick={selectAll}
-                  className="flex-1 text-xs py-1.5 rounded-lg bg-purple-500/40 hover:bg-purple-500/60 transition-colors"
-                >
-                  Select All
-                </button>
-                <button
-                  onClick={clearAll}
-                  className="flex-1 text-xs py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
-                >
-                  Clear All
-                </button>
+                <button onClick={selectAll} className={`flex-1 text-xs py-1.5 rounded-lg transition-colors ${H.btnSelectAll}`}>Select All</button>
+                <button onClick={clearAll} className={`flex-1 text-xs py-1.5 rounded-lg transition-colors ${H.btnClear}`}>Clear All</button>
               </div>
-
               {topicsExpanded && (
                 <div className="space-y-4 max-h-80 overflow-y-auto pr-1">
                   {TOPICS.map((cat) => {
@@ -504,11 +809,7 @@ export default function Home() {
                         <button
                           onClick={() => toggleCategory(cat.category)}
                           className={`w-full text-left px-3 py-2 rounded-lg font-semibold text-sm transition-colors ${
-                            allChecked
-                              ? 'bg-purple-500/50'
-                              : someChecked
-                              ? 'bg-purple-500/30'
-                              : 'bg-white/5 hover:bg-white/10'
+                            allChecked ? H.catActive : someChecked ? H.catPartial : H.catInactive
                           }`}
                         >
                           {allChecked ? '☑' : someChecked ? '⊟' : '☐'} {cat.category}
@@ -519,9 +820,7 @@ export default function Home() {
                               key={sub}
                               onClick={() => toggleSubtopic(sub)}
                               className={`w-full text-left px-3 py-1.5 rounded text-xs transition-colors ${
-                                selectedSubtopics.has(sub)
-                                  ? 'bg-purple-400/40 text-white'
-                                  : 'text-purple-200 hover:bg-white/10'
+                                selectedSubtopics.has(sub) ? H.subActive : H.subInactive
                               }`}
                             >
                               {selectedSubtopics.has(sub) ? '☑' : '☐'} {sub}
@@ -535,10 +834,10 @@ export default function Home() {
               )}
             </div>
 
-            {/* Right column — settings */}
+            {/* Right — settings */}
             <div className="space-y-5">
               {/* Difficulty */}
-              <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
+              <div className={`rounded-2xl p-6 ${H.card}`}>
                 <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <span className="text-2xl">🎯</span> Difficulty
                 </h2>
@@ -547,11 +846,7 @@ export default function Home() {
                     <button
                       key={d}
                       onClick={() => toggleDifficulty(d)}
-                      className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${
-                        selectedDifficulties.has(d)
-                          ? DIFFICULTY_COLORS[d] + ' border-current scale-105'
-                          : 'bg-white/5 border-white/20 text-white/50'
-                      }`}
+                      className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${H.diffActive(d)}`}
                     >
                       {d}
                     </button>
@@ -560,7 +855,7 @@ export default function Home() {
               </div>
 
               {/* Question count */}
-              <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
+              <div className={`rounded-2xl p-6 ${H.card}`}>
                 <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <span className="text-2xl">🔢</span> Questions per Session
                 </h2>
@@ -571,48 +866,32 @@ export default function Home() {
                     max={sliderMax || 1}
                     value={Math.min(questionCount, sliderMax || 1)}
                     onChange={(e) => setQuestionCount(Number(e.target.value))}
-                    className="flex-1 accent-purple-400"
+                    className="flex-1 accent-purple-500"
                   />
-                  <span className="text-3xl font-bold text-purple-200 w-10 text-center">
+                  <span className={`text-3xl font-bold w-10 text-center ${H.muted}`}>
                     {Math.min(questionCount, sliderMax || 0)}
                   </span>
                 </div>
-                <p className="text-xs text-purple-300 mt-2">
-                  {availableCount} questions available with current filters
-                </p>
+                <p className={`text-xs mt-2 ${H.muted}`}>{availableCount} questions available with current filters</p>
               </div>
 
               {/* Timer */}
-              <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
+              <div className={`rounded-2xl p-6 ${H.card}`}>
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-lg font-semibold flex items-center gap-2">
                     <span className="text-2xl">⏱️</span> Timer Mode
                   </h2>
                   <button
                     onClick={() => setTimerEnabled((v) => !v)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      timerEnabled ? 'bg-purple-500' : 'bg-gray-600'
-                    }`}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${H.timerToggle(timerEnabled)}`}
                   >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        timerEnabled ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${timerEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
                 {timerEnabled && (
                   <div className="flex gap-2 mt-1">
                     {[30, 60, 90].map((s) => (
-                      <button
-                        key={s}
-                        onClick={() => setTimerSeconds(s)}
-                        className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all ${
-                          timerSeconds === s
-                            ? 'bg-purple-500 text-white'
-                            : 'bg-white/10 text-purple-200 hover:bg-white/20'
-                        }`}
-                      >
+                      <button key={s} onClick={() => setTimerSeconds(s)} className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all ${H.timerBtn(timerSeconds === s)}`}>
                         {s}s
                       </button>
                     ))}
@@ -620,55 +899,62 @@ export default function Home() {
                 )}
               </div>
 
-              {/* Summary */}
-              <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
+              {/* Session summary */}
+              <div className={`rounded-2xl p-6 ${H.card}`}>
                 <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
                   <span className="text-2xl">📋</span> Session Summary
                 </h2>
-                <ul className="text-sm text-purple-200 space-y-1">
-                  <li>
-                    Topics:{' '}
-                    <span className="text-white font-medium">
-                      {selectedSubtopics.size === 0
-                        ? 'All topics'
-                        : `${selectedSubtopics.size} selected`}
-                    </span>
-                  </li>
-                  <li>
-                    Difficulty:{' '}
-                    <span className="text-white font-medium">
-                      {selectedDifficulties.size === 0
-                        ? 'None selected'
-                        : [...selectedDifficulties].join(', ')}
-                    </span>
-                  </li>
-                  <li>
-                    Questions:{' '}
-                    <span className="text-white font-medium">
-                      {Math.min(questionCount, sliderMax || 0)}
-                    </span>
-                  </li>
-                  {timerEnabled && (
-                    <li>
-                      Timer:{' '}
-                      <span className="text-white font-medium">{timerSeconds}s per question</span>
-                    </li>
-                  )}
+                <ul className={`text-sm space-y-1 ${H.summaryText}`}>
+                  <li>Topics: <span className={`font-medium ${H.summaryVal}`}>{selectedSubtopics.size === 0 ? 'All topics' : `${selectedSubtopics.size} selected`}</span></li>
+                  <li>Difficulty: <span className={`font-medium ${H.summaryVal}`}>{selectedDifficulties.size === 0 ? 'None' : [...selectedDifficulties].join(', ')}</span></li>
+                  <li>Questions: <span className={`font-medium ${H.summaryVal}`}>{Math.min(questionCount, sliderMax || 0)}</span></li>
+                  {timerEnabled && <li>Timer: <span className={`font-medium ${H.summaryVal}`}>{timerSeconds}s per question</span></li>}
                 </ul>
               </div>
 
-              {/* Start button */}
+              {/* Start Quiz */}
               <button
                 onClick={startQuiz}
                 disabled={availableCount === 0 || selectedDifficulties.size === 0}
-                className="w-full py-4 rounded-2xl text-lg font-bold transition-all bg-white text-purple-900 hover:bg-purple-100 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+                className={`w-full py-4 rounded-2xl text-lg font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg hover:shadow-xl hover:-translate-y-0.5 ${H.startBtn}`}
               >
                 Start Quiz →
               </button>
+
+              {/* Feature 10: Save settings button */}
+              {!showSaveDialog ? (
+                <button
+                  onClick={() => setShowSaveDialog(true)}
+                  className={`w-full py-2.5 rounded-2xl text-sm font-medium transition-colors ${H.btnClear}`}
+                >
+                  💾 Save current settings as a set
+                </button>
+              ) : (
+                <div className={`rounded-2xl p-4 ${H.saveDialogBg}`}>
+                  <p className={`text-xs font-semibold mb-2 ${H.muted}`}>Name this set:</p>
+                  <input
+                    type="text"
+                    value={saveSetName}
+                    onChange={(e) => setSaveSetName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') saveCurrentSet(); if (e.key === 'Escape') { setShowSaveDialog(false); setSaveSetName(''); } }}
+                    placeholder="e.g. Energetics lesson starter"
+                    autoFocus
+                    className={`w-full text-sm px-3 py-2 rounded-lg mb-3 outline-none transition-colors ${H.input}`}
+                  />
+                  <div className="flex gap-2">
+                    <button onClick={saveCurrentSet} disabled={!saveSetName.trim()} className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-40 ${H.loadBtn}`}>
+                      Save
+                    </button>
+                    <button onClick={() => { setShowSaveDialog(false); setSaveSetName(''); }} className={`flex-1 py-2 rounded-lg text-sm transition-colors ${H.btnClear}`}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
-        <p className="text-center text-purple-300/60 text-xs mt-8 pb-8">
+        <p className={`text-center text-xs mt-8 pb-8 ${H.footer}`}>
           Mrs P Oremosu · Loxford School · <span className="font-mono">v{APP_VERSION}</span>
         </p>
       </div>
@@ -692,148 +978,132 @@ export default function Home() {
     const revealedCount = quiz.revealed.filter(Boolean).length;
 
     const timerPct = timerEnabled && timerSeconds > 0 ? (timeLeft / timerSeconds) * 100 : 0;
-    const timerBarColor =
-      timerPct > 50 ? 'bg-green-500' : timerPct > 25 ? 'bg-yellow-500' : 'bg-red-500';
-    const timerTextColor =
-      timerPct > 50 ? 'text-green-400' : timerPct > 25 ? 'text-yellow-400' : 'text-red-400';
+    const timerBarColor = timerPct > 50 ? 'bg-green-500' : timerPct > 25 ? 'bg-yellow-500' : 'bg-red-500';
+    const timerTextColor = timerPct > 50 ? 'text-green-400' : timerPct > 25 ? 'text-yellow-400' : 'text-red-400';
+
+    // Feature 9: worked explanation step-through
+    const expSentences = splitExplanation(q.explanation);
+    const visibleCount = isReviewing ? expSentences.length : explanationStep;
+    const visibleSentences = expSentences.slice(0, visibleCount);
+    const hasMoreSteps = visibleCount < expSentences.length;
+
+    // Explanation box colour
+    const expClass = isTimedOut ? Q.expTimeout : isCorrect ? Q.expCorrect : Q.expWrong;
+    const expPrefix = isTimedOut ? "⏰ Time's up! " : isCorrect ? '✓ Correct! ' : '✗ Incorrect. ';
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
-        <div className="max-w-2xl mx-auto px-4 py-8">
+      <div className={`min-h-screen bg-gradient-to-br ${Q.page}`}>
+        <div className={`max-w-2xl mx-auto px-4 ${presentationMode ? 'py-6' : 'py-8'}`}>
           {/* Top bar */}
           <div className="flex items-center justify-between mb-4">
-            <button
-              onClick={resetToHome}
-              className="text-gray-400 hover:text-white text-sm transition-colors"
-            >
+            <button onClick={resetToHome} className={`text-sm transition-colors ${Q.homeBtn}`}>
               ← Home
             </button>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              {/* Feature 12 + 1: light mode & presentation mode toggles */}
+              <button
+                onClick={toggleLightMode}
+                title={lightMode ? 'Dark mode' : 'Light mode'}
+                className={`text-sm px-2 py-1 rounded-lg transition-colors ${Q.homeBtn}`}
+              >
+                {lightMode ? '🌙' : '☀️'}
+              </button>
+              <button
+                onClick={togglePresentationMode}
+                title={presentationMode ? 'Exit presentation mode' : 'Presentation mode (fullscreen)'}
+                className={`text-sm px-2 py-1 rounded-lg transition-colors ${presentationMode ? 'bg-purple-500 text-white' : Q.homeBtn}`}
+              >
+                {presentationMode ? '📽️ On' : '📽️'}
+              </button>
               {revealedCount > 0 && (
-                <span className="text-sm text-green-400 font-medium">
-                  ✅ {score}/{revealedCount} correct
+                <span className={`font-medium ${Q.scoreBadge} ${P.counter}`}>
+                  ✅ {score}/{revealedCount}
                 </span>
               )}
-              <span className="text-sm text-gray-400">
+              <span className={P.counter + ' ' + Q.counter}>
                 {quiz.currentIndex + 1} / {quiz.selectedQuestions.length}
               </span>
             </div>
           </div>
 
           {/* Progress bar */}
-          <div className="w-full bg-gray-700 rounded-full h-2 mb-2">
-            <div
-              className="bg-purple-500 h-2 rounded-full transition-all duration-500"
-              style={{ width: `${progress}%` }}
-            />
+          <div className={`w-full rounded-full h-2 mb-2 ${Q.progBg}`}>
+            <div className="bg-purple-500 h-2 rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
           </div>
 
           {/* Timer bar */}
           {timerEnabled && !answered && (
-            <div className="w-full bg-gray-700 rounded-full h-1.5 mb-2">
-              <div
-                className={`h-1.5 rounded-full transition-all duration-1000 ${timerBarColor}`}
-                style={{ width: `${timerPct}%` }}
-              />
+            <div className={`w-full rounded-full h-1.5 mb-2 ${Q.progBg}`}>
+              <div className={`h-1.5 rounded-full transition-all duration-1000 ${timerBarColor}`} style={{ width: `${timerPct}%` }} />
             </div>
           )}
-
-          {/* Timer countdown */}
           {timerEnabled && !answered && (
-            <div className={`text-center text-sm font-bold mb-4 ${timerTextColor}`}>
-              ⏰ {timeLeft}s
-            </div>
+            <div className={`text-center font-bold mb-4 ${timerTextColor} ${P.counter}`}>⏰ {timeLeft}s</div>
           )}
 
           {/* Review banner */}
           {isReviewing && (
-            <div className="mb-4 px-4 py-2 rounded-xl bg-yellow-900/30 border border-yellow-600/50 text-yellow-300 text-sm text-center">
+            <div className={`mb-4 px-4 py-2 rounded-xl text-sm text-center ${Q.reviewBanner}`}>
               👀 Reviewing answered question — your answer is locked in
             </div>
           )}
 
           {/* Question card */}
-          <div
-            className={`bg-gray-800 rounded-2xl p-7 shadow-2xl ${
-              isTimedOut ? 'border border-orange-600/50' : ''
-            }`}
-          >
-            {/* Meta */}
+          <div className={`rounded-2xl shadow-2xl ${presentationMode ? 'p-8' : 'p-7'} ${Q.card} ${isTimedOut ? 'ring-2 ring-orange-500/40' : ''}`}>
+            {/* Meta tags */}
             <div className="flex flex-wrap gap-2 mb-5">
-              <span className="text-xs px-2.5 py-1 bg-purple-900/60 text-purple-300 rounded-full">
-                {q.topic}
-              </span>
-              <span className="text-xs px-2.5 py-1 bg-gray-700 text-gray-300 rounded-full">
-                {q.subtopic}
-              </span>
-              <span
-                className={`text-xs px-2.5 py-1 rounded-full font-semibold ${DIFFICULTY_BADGE[q.difficulty]} text-white`}
-              >
-                {q.difficulty}
-              </span>
-              {isTimedOut && (
-                <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-orange-600 text-white">
-                  ⏰ Timed Out
-                </span>
-              )}
+              <span className={`rounded-full ${P.meta} ${Q.topicTag}`}>{q.topic}</span>
+              <span className={`rounded-full ${P.meta} ${Q.subtopicTag}`}>{q.subtopic}</span>
+              <span className={`rounded-full font-semibold ${P.meta} ${DIFFICULTY_BADGE[q.difficulty]} text-white`}>{q.difficulty}</span>
+              {isTimedOut && <span className={`rounded-full font-semibold bg-orange-600 text-white ${P.meta}`}>⏰ Timed Out</span>}
             </div>
 
             {/* Question text */}
-            <p className="text-lg font-medium leading-relaxed mb-6">{q.question}</p>
+            <p className={`mb-6 ${Q.questionText} ${P.questionText}`}>{q.question}</p>
 
             {/* Options */}
             <div className="space-y-3">
               {q.options.map((opt, i) => {
-                let style =
-                  'w-full text-left px-4 py-3.5 rounded-xl border-2 transition-all text-sm font-medium ';
-                if (!answered) {
-                  style +=
-                    'border-gray-600 bg-gray-700/50 hover:bg-gray-700 hover:border-purple-500 cursor-pointer';
-                } else if (i === q.correctAnswer) {
-                  style += 'border-green-500 bg-green-900/30 text-green-300';
-                } else if (i === userAnswer && !isCorrect) {
-                  style += 'border-red-500 bg-red-900/30 text-red-300';
-                } else {
-                  style += 'border-gray-600 bg-gray-700/30 text-gray-500 cursor-default';
-                }
-
+                let style = `w-full text-left rounded-xl border-2 transition-all font-medium ${P.optionPad} ${P.optionText} `;
+                if (!answered) style += Q.optUnanswered;
+                else if (i === q.correctAnswer) style += Q.optCorrect;
+                else if (i === userAnswer && !isCorrect) style += Q.optWrong;
+                else style += Q.optDim;
                 return (
-                  <button
-                    key={i}
-                    onClick={() => handleAnswer(i)}
-                    disabled={answered}
-                    className={style}
-                  >
-                    <span className="inline-block w-6 font-bold mr-2 text-gray-400">
+                  <button key={i} onClick={() => handleAnswer(i)} disabled={answered} className={style}>
+                    <span className={`inline-block font-bold mr-2 ${Q.optLetter} ${P.optionLetter}`}>
                       {String.fromCharCode(65 + i)}.
                     </span>
                     {opt}
-                    {answered && i === q.correctAnswer && (
-                      <span className="ml-2 text-green-400">✓</span>
-                    )}
-                    {answered && i === userAnswer && !isCorrect && !isTimedOut && (
-                      <span className="ml-2 text-red-400">✗</span>
-                    )}
+                    {answered && i === q.correctAnswer && <span className="ml-2 text-green-500">✓</span>}
+                    {answered && i === userAnswer && !isCorrect && !isTimedOut && <span className="ml-2 text-red-500">✗</span>}
                   </button>
                 );
               })}
             </div>
 
-            {/* Explanation */}
+            {/* Feature 9: Worked explanation (step-through) */}
             {answered && (
-              <div
-                className={`mt-5 p-4 rounded-xl text-sm leading-relaxed border ${
-                  isTimedOut
-                    ? 'bg-orange-900/20 border-orange-700 text-orange-200'
-                    : isCorrect
-                    ? 'bg-green-900/20 border-green-700 text-green-200'
-                    : 'bg-red-900/20 border-red-700 text-red-200'
-                }`}
-              >
-                <span className="font-bold">
-                  {isTimedOut ? "⏰ Time's up! " : isCorrect ? '✓ Correct! ' : '✗ Incorrect. '}
-                </span>
-                {q.explanation}
+              <div className={`mt-5 p-4 rounded-xl border ${expClass} ${P.exp}`}>
+                <span className="font-bold">{expPrefix}</span>
+                {visibleSentences.length > 0 && (
+                  <div className="mt-2 space-y-1.5">
+                    {visibleSentences.map((sentence, i) => (
+                      <p key={i}>{sentence}</p>
+                    ))}
+                  </div>
+                )}
+                {hasMoreSteps && (
+                  <button
+                    onClick={() => setExplanationStep((v) => v + 1)}
+                    className={`mt-3 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${Q.stepBtn}`}
+                  >
+                    Show next step →
+                  </button>
+                )}
+                {!hasMoreSteps && expSentences.length > 1 && (
+                  <p className="mt-2 text-xs opacity-60">✓ Full explanation shown</p>
+                )}
               </div>
             )}
           </div>
@@ -843,38 +1113,35 @@ export default function Home() {
             <button
               onClick={goBack}
               disabled={quiz.currentIndex === 0}
-              className="px-5 py-2.5 rounded-xl bg-gray-700 text-gray-300 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+              className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-colors ${Q.navBack}`}
             >
               ← Back
             </button>
             <button
               onClick={goNext}
               disabled={!answered}
-              className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-30 disabled:cursor-not-allowed text-sm font-bold transition-colors"
+              className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-colors ${Q.navNext}`}
             >
               {isLast ? 'Finish & See Results →' : 'Next Question →'}
             </button>
           </div>
 
-          {/* Keyboard shortcut hint */}
-          <p className="text-center text-gray-600 text-xs mt-4">
-            <kbd className="bg-gray-700/60 text-gray-400 px-1.5 py-0.5 rounded text-xs">A</kbd>{' '}
-            <kbd className="bg-gray-700/60 text-gray-400 px-1.5 py-0.5 rounded text-xs">B</kbd>{' '}
-            <kbd className="bg-gray-700/60 text-gray-400 px-1.5 py-0.5 rounded text-xs">C</kbd>{' '}
-            <kbd className="bg-gray-700/60 text-gray-400 px-1.5 py-0.5 rounded text-xs">D</kbd>{' '}
-            to answer
-            {answered && (
-              <>
-                {' '}·{' '}
-                <kbd className="bg-gray-700/60 text-gray-400 px-1.5 py-0.5 rounded text-xs">Enter</kbd>{' '}
-                or{' '}
-                <kbd className="bg-gray-700/60 text-gray-400 px-1.5 py-0.5 rounded text-xs">→</kbd>{' '}
-                to continue
-              </>
-            )}
-          </p>
+          {/* Keyboard hints */}
+          {!presentationMode && (
+            <p className={`text-center text-xs mt-4 ${Q.kbdText}`}>
+              <kbd className={`px-1.5 py-0.5 rounded text-xs ${Q.kbd}`}>A</kbd>{' '}
+              <kbd className={`px-1.5 py-0.5 rounded text-xs ${Q.kbd}`}>B</kbd>{' '}
+              <kbd className={`px-1.5 py-0.5 rounded text-xs ${Q.kbd}`}>C</kbd>{' '}
+              <kbd className={`px-1.5 py-0.5 rounded text-xs ${Q.kbd}`}>D</kbd>{' '}
+              to answer
+              {answered && (
+                <> · <kbd className={`px-1.5 py-0.5 rounded text-xs ${Q.kbd}`}>Enter</kbd>{' '}
+                or <kbd className={`px-1.5 py-0.5 rounded text-xs ${Q.kbd}`}>→</kbd> to continue</>
+              )}
+            </p>
+          )}
 
-          <p className="text-center text-gray-600 text-xs mt-3">
+          <p className={`text-center text-xs mt-3 ${Q.footer}`}>
             Mrs P Oremosu · Loxford School · <span className="font-mono">v{APP_VERSION}</span>
           </p>
         </div>
@@ -890,20 +1157,14 @@ export default function Home() {
     const total = quiz.selectedQuestions.length;
     const timedOutCount = quiz.answers.filter((a) => a === -1).length;
     const pct = Math.round((score / total) * 100);
-    const wrongCount = quiz.answers.filter((a, i) => {
-      return a === null || a === -1 || a !== quiz.selectedQuestions[i].correctAnswer;
-    }).length;
+    const wrongCount = quiz.answers.filter((a, i) => a === null || a === -1 || a !== quiz.selectedQuestions[i].correctAnswer).length;
 
     const grade =
-      pct >= 90
-        ? { label: 'Excellent!', emoji: '🏆', color: 'text-yellow-400' }
-        : pct >= 70
-        ? { label: 'Good Work!', emoji: '🎉', color: 'text-green-400' }
-        : pct >= 50
-        ? { label: 'Getting There', emoji: '📖', color: 'text-blue-400' }
-        : { label: 'Keep Revising', emoji: '💪', color: 'text-orange-400' };
+      pct >= 90 ? { label: 'Excellent!', emoji: '🏆', color: 'text-yellow-400' }
+      : pct >= 70 ? { label: 'Good Work!', emoji: '🎉', color: 'text-green-400' }
+      : pct >= 50 ? { label: 'Getting There', emoji: '📖', color: 'text-blue-400' }
+      : { label: 'Keep Revising', emoji: '💪', color: 'text-orange-400' };
 
-    // Per-subtopic breakdown
     const subtopicStats: Record<string, { correct: number; total: number }> = {};
     quiz.selectedQuestions.forEach((q, i) => {
       if (!subtopicStats[q.subtopic]) subtopicStats[q.subtopic] = { correct: 0, total: 0 };
@@ -911,15 +1172,10 @@ export default function Home() {
       const a = quiz.answers[i];
       if (a !== null && a >= 0 && a === q.correctAnswer) subtopicStats[q.subtopic].correct++;
     });
-    const subtopicEntries = Object.entries(subtopicStats).sort(
-      ([, a], [, b]) => a.correct / a.total - b.correct / b.total
-    );
+    const subtopicEntries = Object.entries(subtopicStats).sort(([, a], [, b]) => a.correct / a.total - b.correct / b.total);
 
-    // Per-difficulty breakdown
     const diffStats: Record<Difficulty, { correct: number; total: number }> = {
-      Easy: { correct: 0, total: 0 },
-      Medium: { correct: 0, total: 0 },
-      Hard: { correct: 0, total: 0 },
+      Easy: { correct: 0, total: 0 }, Medium: { correct: 0, total: 0 }, Hard: { correct: 0, total: 0 },
     };
     quiz.selectedQuestions.forEach((q, i) => {
       diffStats[q.difficulty].total++;
@@ -928,46 +1184,28 @@ export default function Home() {
     });
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
+      <div className={`min-h-screen bg-gradient-to-br ${Q.page}`}>
         <div className="max-w-2xl mx-auto px-4 py-10">
           {/* Score header */}
           <div className="text-center mb-8">
             <div className="text-6xl mb-4">{grade.emoji}</div>
             <h1 className={`text-4xl font-bold mb-1 ${grade.color}`}>{grade.label}</h1>
-            <p className="text-gray-400">
-              You scored{' '}
-              <span className="text-white font-bold text-2xl">
-                {score}/{total}
-              </span>{' '}
-              ({pct}%)
+            <p className={Q.pct}>
+              You scored <span className="font-bold text-2xl" style={{ color: 'inherit' }}>{score}/{total}</span> ({pct}%)
             </p>
             {timedOutCount > 0 && (
-              <p className="text-orange-400 text-sm mt-1">
-                ⏰ {timedOutCount} question{timedOutCount !== 1 ? 's' : ''} timed out
-              </p>
+              <p className={`text-sm mt-1 ${Q.timeout}`}>⏰ {timedOutCount} question{timedOutCount !== 1 ? 's' : ''} timed out</p>
             )}
-
-            {/* Score bar */}
-            <div className="w-full bg-gray-700 rounded-full h-4 mt-5 max-w-sm mx-auto">
-              <div
-                className={`h-4 rounded-full transition-all duration-700 ${
-                  pct >= 70 ? 'bg-green-500' : pct >= 50 ? 'bg-yellow-500' : 'bg-red-500'
-                }`}
-                style={{ width: `${pct}%` }}
-              />
+            <div className={`w-full rounded-full h-4 mt-5 max-w-sm mx-auto ${Q.progBg}`}>
+              <div className={`h-4 rounded-full transition-all duration-700 ${pct >= 70 ? 'bg-green-500' : pct >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${pct}%` }} />
             </div>
-
-            {/* Difficulty breakdown badges */}
             <div className="flex justify-center gap-3 mt-4 flex-wrap">
               {(['Easy', 'Medium', 'Hard'] as Difficulty[]).map((d) => {
                 const s = diffStats[d];
                 if (s.total === 0) return null;
                 const dpct = Math.round((s.correct / s.total) * 100);
                 return (
-                  <span
-                    key={d}
-                    className={`text-xs px-3 py-1.5 rounded-full font-semibold ${DIFFICULTY_BADGE[d]} text-white`}
-                  >
+                  <span key={d} className={`text-xs px-3 py-1.5 rounded-full font-semibold ${DIFFICULTY_BADGE[d]} text-white`}>
                     {d}: {s.correct}/{s.total} ({dpct}%)
                   </span>
                 );
@@ -977,26 +1215,20 @@ export default function Home() {
 
           {/* Topic breakdown */}
           {subtopicEntries.length > 1 && (
-            <div className="bg-gray-800 rounded-2xl p-6 mb-6">
-              <h2 className="text-lg font-semibold text-gray-300 mb-4">📊 Topic Breakdown</h2>
+            <div className={`rounded-2xl p-6 mb-6 ${Q.card}`}>
+              <h2 className={`text-lg font-semibold mb-4 ${Q.h2}`}>📊 Topic Breakdown</h2>
               <div className="space-y-3">
                 {subtopicEntries.map(([subtopic, stats]) => {
                   const subPct = Math.round((stats.correct / stats.total) * 100);
-                  const barColor =
-                    subPct >= 70 ? 'bg-green-500' : subPct >= 50 ? 'bg-yellow-500' : 'bg-red-500';
+                  const barColor = subPct >= 70 ? 'bg-green-500' : subPct >= 50 ? 'bg-yellow-500' : 'bg-red-500';
                   return (
                     <div key={subtopic}>
                       <div className="flex justify-between text-xs mb-1">
-                        <span className="text-gray-300 truncate mr-2">{subtopic}</span>
-                        <span className="text-gray-400 shrink-0">
-                          {stats.correct}/{stats.total}
-                        </span>
+                        <span className={`truncate mr-2 ${Q.subText}`}>{subtopic}</span>
+                        <span className={`shrink-0 ${Q.subCount}`}>{stats.correct}/{stats.total}</span>
                       </div>
-                      <div className="w-full bg-gray-700 rounded-full h-2">
-                        <div
-                          className={`h-2 rounded-full ${barColor}`}
-                          style={{ width: `${subPct}%` }}
-                        />
+                      <div className={`w-full rounded-full h-2 ${Q.subBar}`}>
+                        <div className={`h-2 rounded-full ${barColor}`} style={{ width: `${subPct}%` }} />
                       </div>
                     </div>
                   );
@@ -1005,89 +1237,48 @@ export default function Home() {
             </div>
           )}
 
-          {/* Question review — collapsible cards */}
+          {/* Question review */}
           <div className="mb-8">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-semibold text-gray-300">Question Review</h2>
+              <h2 className={`text-lg font-semibold ${Q.h2}`}>Question Review</h2>
               <div className="flex gap-2">
-                <button
-                  onClick={() =>
-                    setExpandedReviewCards(
-                      new Set(quiz.selectedQuestions.map((_, i) => i))
-                    )
-                  }
-                  className="text-xs text-purple-400 hover:text-purple-300 px-2 py-1 rounded hover:bg-white/5 transition-colors"
-                >
+                <button onClick={() => setExpandedReviewCards(new Set(quiz.selectedQuestions.map((_, i) => i)))} className="text-xs text-purple-400 hover:text-purple-300 px-2 py-1 rounded transition-colors">
                   Expand all
                 </button>
-                <button
-                  onClick={() => setExpandedReviewCards(new Set())}
-                  className="text-xs text-gray-500 hover:text-gray-400 px-2 py-1 rounded hover:bg-white/5 transition-colors"
-                >
+                <button onClick={() => setExpandedReviewCards(new Set())} className={`text-xs px-2 py-1 rounded transition-colors ${Q.reviewMuted}`}>
                   Collapse all
                 </button>
               </div>
             </div>
-
             <div className="space-y-2">
               {quiz.selectedQuestions.map((q, i) => {
                 const ua = quiz.answers[i];
                 const isTO = ua === -1;
                 const correct = !isTO && ua === q.correctAnswer;
                 const expanded = expandedReviewCards.has(i);
-
                 return (
-                  <div
-                    key={q.id}
-                    className={`rounded-xl border overflow-hidden ${
-                      isTO
-                        ? 'bg-orange-900/20 border-orange-700/50'
-                        : correct
-                        ? 'bg-green-900/20 border-green-700/50'
-                        : 'bg-red-900/20 border-red-700/50'
-                    }`}
-                  >
-                    {/* Collapsed header — always visible */}
-                    <button
-                      onClick={() => toggleReviewCard(i)}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
-                    >
-                      <span className="text-base shrink-0">
-                        {isTO ? '⏰' : correct ? '✅' : '❌'}
-                      </span>
+                  <div key={q.id} className={`rounded-xl border overflow-hidden ${isTO ? Q.reviewTimeout : correct ? Q.reviewCorrect : Q.reviewWrong}`}>
+                    <button onClick={() => toggleReviewCard(i)} className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${Q.reviewHeader}`}>
+                      <span className="text-base shrink-0">{isTO ? '⏰' : correct ? '✅' : '❌'}</span>
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap gap-1.5 items-center mb-0.5">
-                          <span className="text-xs text-purple-400 truncate max-w-[150px]">
-                            {q.subtopic}
-                          </span>
-                          <span
-                            className={`text-xs font-semibold px-1.5 py-0.5 rounded ${DIFFICULTY_BADGE[q.difficulty]} text-white`}
-                          >
-                            {q.difficulty}
-                          </span>
+                          <span className={`text-xs truncate max-w-[150px] ${Q.reviewSubtopic}`}>{q.subtopic}</span>
+                          <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${DIFFICULTY_BADGE[q.difficulty]} text-white`}>{q.difficulty}</span>
                         </div>
-                        <p className="text-xs text-gray-400 truncate">{q.question}</p>
+                        <p className={`text-xs truncate ${Q.reviewMuted}`}>{q.question}</p>
                       </div>
-                      <span className="text-gray-600 text-xs shrink-0 ml-2">
-                        {expanded ? '▲' : '▼'}
-                      </span>
+                      <span className={`text-xs shrink-0 ml-2 ${Q.reviewChevron}`}>{expanded ? '▲' : '▼'}</span>
                     </button>
-
-                    {/* Expanded body */}
                     {expanded && (
-                      <div className="px-4 pb-4 pt-2 border-t border-white/5">
-                        <p className="text-sm text-gray-200 mb-3 leading-relaxed">{q.question}</p>
+                      <div className={`px-4 pb-4 pt-2 border-t ${Q.reviewDivider}`}>
+                        <p className={`text-sm mb-3 leading-relaxed ${Q.reviewBody}`}>{q.question}</p>
                         {isTO ? (
-                          <p className="text-xs text-orange-300 mb-2">⏰ Timed out</p>
+                          <p className="text-xs text-orange-400 mb-2">⏰ Timed out</p>
                         ) : !correct && ua !== null ? (
-                          <p className="text-xs text-red-300 mb-2">
-                            Your answer: {q.options[ua]}
-                          </p>
+                          <p className="text-xs text-red-400 mb-2">Your answer: {q.options[ua]}</p>
                         ) : null}
-                        <p className="text-xs text-green-300 mb-2">
-                          ✓ Correct: {q.options[q.correctAnswer]}
-                        </p>
-                        <p className="text-xs text-gray-400 leading-relaxed">{q.explanation}</p>
+                        <p className="text-xs text-green-400 mb-2">✓ Correct: {q.options[q.correctAnswer]}</p>
+                        <p className={`text-xs leading-relaxed ${Q.reviewMuted}`}>{q.explanation}</p>
                       </div>
                     )}
                   </div>
@@ -1099,30 +1290,21 @@ export default function Home() {
           {/* Actions */}
           <div className="space-y-3">
             <div className="flex gap-3">
-              <button
-                onClick={resetToHome}
-                className="flex-1 py-3.5 rounded-2xl bg-white text-gray-900 font-bold hover:bg-gray-100 transition-colors text-sm"
-              >
+              <button onClick={resetToHome} className={`flex-1 py-3.5 rounded-2xl font-bold transition-colors text-sm ${Q.backHome}`}>
                 🏠 Back to Home
               </button>
-              <button
-                onClick={startQuiz}
-                className="flex-1 py-3.5 rounded-2xl bg-purple-600 hover:bg-purple-500 font-bold transition-colors text-sm"
-              >
+              <button onClick={startQuiz} className={`flex-1 py-3.5 rounded-2xl font-bold transition-colors text-sm ${Q.retry}`}>
                 🔄 Retry Same Settings
               </button>
             </div>
             {wrongCount > 0 && (
-              <button
-                onClick={retryWrongOnly}
-                className="w-full py-3.5 rounded-2xl bg-red-700 hover:bg-red-600 font-bold transition-colors text-sm"
-              >
+              <button onClick={retryWrongOnly} className={`w-full py-3.5 rounded-2xl font-bold transition-colors text-sm ${Q.retryWrong}`}>
                 ❌ Retry {wrongCount} Wrong Answer{wrongCount !== 1 ? 's' : ''} Only
               </button>
             )}
           </div>
 
-          <p className="text-center text-gray-600 text-xs mt-6">
+          <p className={`text-center text-xs mt-6 ${Q.footer}`}>
             Mrs P Oremosu · Loxford School · <span className="font-mono">v{APP_VERSION}</span>
           </p>
         </div>
