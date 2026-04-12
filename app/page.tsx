@@ -148,6 +148,135 @@ const LESSON_PACKS: LessonPack[] = [
   },
 ];
 
+// ── Video resources — one YouTube search link per subtopic ──
+interface VideoGroup {
+  name: string;
+  emoji: string;
+  subtopics: { name: string; query: string }[];
+}
+
+function ytUrl(query: string) {
+  return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+}
+
+const VIDEO_GROUPS: VideoGroup[] = [
+  {
+    name: 'AS Physical Chemistry', emoji: '⚛️',
+    subtopics: [
+      { name: 'Atomic Structure', query: 'AQA A Level Chemistry Atomic Structure revision' },
+      { name: 'Amount of Substance', query: 'AQA A Level Chemistry Amount of Substance moles revision' },
+      { name: 'Bonding', query: 'AQA A Level Chemistry Bonding revision' },
+      { name: 'Energetics', query: 'AQA A Level Chemistry Energetics enthalpy revision' },
+      { name: 'Kinetics', query: 'AQA A Level Chemistry Kinetics revision' },
+      { name: "Chemical Equilibria & Le Chatelier's", query: "AQA A Level Chemistry Equilibria Le Chatelier revision" },
+      { name: 'Redox', query: 'AQA A Level Chemistry Redox revision' },
+    ],
+  },
+  {
+    name: 'A2 Physical Chemistry', emoji: '🔬',
+    subtopics: [
+      { name: 'Thermodynamics', query: 'AQA A Level Chemistry Thermodynamics entropy revision' },
+      { name: 'Rate Equations', query: 'AQA A Level Chemistry Rate Equations revision' },
+      { name: 'Kp', query: 'AQA A Level Chemistry Kp equilibrium constant revision' },
+      { name: 'Electrochemical Cells', query: 'AQA A Level Chemistry Electrochemical Cells revision' },
+      { name: 'Acids & Bases', query: 'AQA A Level Chemistry Acids Bases pH buffers revision' },
+    ],
+  },
+  {
+    name: 'Inorganic Chemistry', emoji: '🧪',
+    subtopics: [
+      { name: 'Periodicity', query: 'AQA A Level Chemistry Periodicity Period 3 revision' },
+      { name: 'Group 2', query: 'AQA A Level Chemistry Group 2 alkaline earth metals revision' },
+      { name: 'Group 7', query: 'AQA A Level Chemistry Group 7 halogens revision' },
+      { name: 'Period 3 Oxides', query: 'AQA A Level Chemistry Period 3 oxides revision' },
+      { name: 'Transition Metals', query: 'AQA A Level Chemistry Transition Metals revision' },
+      { name: 'Reactions of Aqueous Ions', query: 'AQA A Level Chemistry Reactions Aqueous Ions revision' },
+    ],
+  },
+  {
+    name: 'Organic Chemistry AS', emoji: '🔗',
+    subtopics: [
+      { name: 'Introduction to Organic Chemistry', query: 'AQA A Level Chemistry Introduction Organic Chemistry revision' },
+      { name: 'Alkanes', query: 'AQA A Level Chemistry Alkanes revision' },
+      { name: 'Halogenoalkanes', query: 'AQA A Level Chemistry Halogenoalkanes revision' },
+      { name: 'Alkenes', query: 'AQA A Level Chemistry Alkenes revision' },
+      { name: 'Alcohols', query: 'AQA A Level Chemistry Alcohols revision' },
+      { name: 'Organic Analysis', query: 'AQA A Level Chemistry Organic Analysis tests revision' },
+    ],
+  },
+  {
+    name: 'Organic Chemistry A2', emoji: '💊',
+    subtopics: [
+      { name: 'Optical Isomerism', query: 'AQA A Level Chemistry Optical Isomerism revision' },
+      { name: 'Aldehydes & Ketones', query: 'AQA A Level Chemistry Aldehydes Ketones carbonyl revision' },
+      { name: 'Carboxylic Acids & Derivatives', query: 'AQA A Level Chemistry Carboxylic Acids revision' },
+      { name: 'Aromatic Chemistry', query: 'AQA A Level Chemistry Aromatic Chemistry benzene revision' },
+      { name: 'Amines', query: 'AQA A Level Chemistry Amines revision' },
+      { name: 'Polymers', query: 'AQA A Level Chemistry Polymers revision' },
+      { name: 'Amino Acids, Proteins & DNA', query: 'AQA A Level Chemistry Amino Acids Proteins DNA revision' },
+      { name: 'Organic Synthesis', query: 'AQA A Level Chemistry Organic Synthesis revision' },
+    ],
+  },
+  {
+    name: 'Spectroscopy & Analysis', emoji: '🔭',
+    subtopics: [
+      { name: 'NMR Spectroscopy', query: 'AQA A Level Chemistry NMR Spectroscopy revision' },
+      { name: 'Chromatography', query: 'AQA A Level Chemistry Chromatography revision' },
+      { name: 'Mass Spectrometry', query: 'AQA A Level Chemistry Mass Spectrometry revision' },
+      { name: 'Infrared Spectroscopy', query: 'AQA A Level Chemistry Infrared Spectroscopy revision' },
+    ],
+  },
+  {
+    name: 'Required Practicals', emoji: '⚗️',
+    subtopics: [
+      { name: 'RP1: Acid-Base Titration', query: 'AQA A Level Chemistry Required Practical titration' },
+      { name: 'RP2: Enthalpy Changes', query: 'AQA A Level Chemistry Required Practical enthalpy calorimetry' },
+      { name: 'RP3: Reaction Rates & Temperature', query: 'AQA A Level Chemistry Required Practical reaction rates temperature' },
+      { name: 'RP4: Inorganic Qualitative Analysis', query: 'AQA A Level Chemistry Required Practical inorganic qualitative analysis' },
+      { name: 'RP5: Distillation', query: 'AQA A Level Chemistry Required Practical distillation' },
+      { name: 'RP6: Organic Functional Group Tests', query: 'AQA A Level Chemistry Required Practical organic functional group tests' },
+      { name: 'RP7: Measuring Rates of Reaction', query: 'AQA A Level Chemistry Required Practical measuring rates reaction' },
+      { name: 'RP8: Electrochemical Cells', query: 'AQA A Level Chemistry Required Practical electrochemical cells' },
+      { name: 'RP9: Chromatography', query: 'AQA A Level Chemistry Required Practical chromatography' },
+      { name: 'RP10: Qualitative Organic Analysis', query: 'AQA A Level Chemistry Required Practical qualitative organic analysis' },
+      { name: 'RP11: Preparation of Organic Solid', query: 'AQA A Level Chemistry Required Practical preparation organic solid aspirin' },
+      { name: 'RP12: Transition Metal Complexes', query: 'AQA A Level Chemistry Required Practical transition metal complexes' },
+    ],
+  },
+  {
+    name: 'Calculation Focus', emoji: '🔢',
+    subtopics: [
+      { name: 'Moles & Amount of Substance', query: 'AQA A Level Chemistry moles calculations revision' },
+      { name: 'Enthalpy Calculations', query: 'AQA A Level Chemistry enthalpy calculations Hess law revision' },
+      { name: 'Rate Equation Calculations', query: 'AQA A Level Chemistry rate equation calculations revision' },
+      { name: 'pH & Ka Calculations', query: 'AQA A Level Chemistry pH Ka calculations revision' },
+      { name: 'Kp Calculations', query: 'AQA A Level Chemistry Kp calculations revision' },
+      { name: 'Electrode Potential Calculations', query: 'AQA A Level Chemistry electrode potential EMF calculations revision' },
+    ],
+  },
+  {
+    name: 'Mechanisms & Reactions', emoji: '⚡',
+    subtopics: [
+      { name: 'Nucleophilic Substitution', query: 'AQA A Level Chemistry nucleophilic substitution mechanism revision' },
+      { name: 'Electrophilic Addition', query: 'AQA A Level Chemistry electrophilic addition mechanism revision' },
+      { name: 'Elimination Reactions', query: 'AQA A Level Chemistry elimination mechanism revision' },
+      { name: 'Nucleophilic Addition', query: 'AQA A Level Chemistry nucleophilic addition carbonyl mechanism revision' },
+      { name: 'Electrophilic Substitution', query: 'AQA A Level Chemistry electrophilic substitution benzene mechanism revision' },
+      { name: 'Condensation Reactions', query: 'AQA A Level Chemistry condensation polymerisation reaction revision' },
+    ],
+  },
+  {
+    name: 'Full Topic Overview', emoji: '📝',
+    subtopics: [
+      { name: 'Complete AS Chemistry Overview', query: 'AQA A Level Chemistry AS complete revision overview' },
+      { name: 'Complete A2 Chemistry Overview', query: 'AQA A Level Chemistry A2 complete revision overview' },
+      { name: 'Paper 1 Topics', query: 'AQA A Level Chemistry Paper 1 revision topics' },
+      { name: 'Paper 2 Topics', query: 'AQA A Level Chemistry Paper 2 revision topics' },
+      { name: 'Paper 3 Practical Skills', query: 'AQA A Level Chemistry Paper 3 practical skills revision' },
+    ],
+  },
+];
+
 // Split explanation text into step-through sentences
 function splitExplanation(text: string): string[] {
   const parts = text.replace(/([.!?])\s+/g, '$1\u0000').split('\u0000');
@@ -188,6 +317,8 @@ export default function Home() {
   const [topicsExpanded, setTopicsExpanded] = useState(true);
   const [lessonPacksExpanded, setLessonPacksExpanded] = useState(false);
   const [savedSetsExpanded, setSavedSetsExpanded] = useState(false);
+  const [homeTab, setHomeTab] = useState<'quiz' | 'videos'>('quiz');
+  const [expandedVideoGroup, setExpandedVideoGroup] = useState<string | null>(null);
 
   // ── Timer ──
   const [timerEnabled, setTimerEnabled] = useState(false);
@@ -665,6 +796,78 @@ export default function Home() {
             <p className={`text-lg ${H.muted}`}>Test yourself on every topic from the AQA specification</p>
           </div>
 
+          {/* ── Tab bar: Quiz Setup / Videos ── */}
+          <div className={`flex gap-1 p-1 rounded-2xl mb-6 ${lightMode ? 'bg-purple-100' : 'bg-white/10'}`}>
+            <button
+              onClick={() => setHomeTab('quiz')}
+              className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition-all ${
+                homeTab === 'quiz'
+                  ? (lightMode ? 'bg-white text-purple-900 shadow' : 'bg-white/20 text-white shadow')
+                  : (lightMode ? 'text-purple-600 hover:text-purple-900' : 'text-purple-300 hover:text-white')
+              }`}
+            >
+              🎯 Quiz Setup
+            </button>
+            <button
+              onClick={() => setHomeTab('videos')}
+              className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition-all ${
+                homeTab === 'videos'
+                  ? (lightMode ? 'bg-white text-purple-900 shadow' : 'bg-white/20 text-white shadow')
+                  : (lightMode ? 'text-purple-600 hover:text-purple-900' : 'text-purple-300 hover:text-white')
+              }`}
+            >
+              📹 Topic Videos
+            </button>
+          </div>
+
+          {/* ── Videos tab ── */}
+          {homeTab === 'videos' && (
+            <div className="space-y-3 mb-8">
+              <p className={`text-sm mb-4 ${H.muted}`}>
+                Click a topic to see revision videos. Each link opens a YouTube search for that subtopic — find the best video for your class.
+              </p>
+              {VIDEO_GROUPS.map((group) => {
+                const isOpen = expandedVideoGroup === group.name;
+                return (
+                  <div key={group.name} className={`rounded-2xl overflow-hidden ${H.card}`}>
+                    <button
+                      onClick={() => setExpandedVideoGroup(isOpen ? null : group.name)}
+                      className={`w-full flex items-center justify-between px-5 py-4 transition-colors ${H.btnToggle}`}
+                    >
+                      <span className="font-semibold flex items-center gap-2 text-base">
+                        <span className="text-xl">{group.emoji}</span> {group.name}
+                        <span className={`text-xs font-normal ${H.muted}`}>({group.subtopics.length} topics)</span>
+                      </span>
+                      <span className="text-sm">{isOpen ? '▲' : '▼'}</span>
+                    </button>
+                    {isOpen && (
+                      <div className="px-5 pb-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {group.subtopics.map((sub) => (
+                            <a
+                              key={sub.name}
+                              href={ytUrl(sub.query)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all border group ${H.packCard}`}
+                            >
+                              <span className="text-base">▶</span>
+                              <span className="flex-1">{sub.name}</span>
+                              <span className={`text-xs opacity-60 group-hover:opacity-100 ${H.packDesc}`}>YouTube →</span>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ── Quiz tab content ── */}
+          {homeTab === 'quiz' && <>
+
           {/* Session history panel */}
           {history.length > 0 && (
             <div className={`rounded-2xl p-5 mb-4 ${H.histCard}`}>
@@ -953,6 +1156,7 @@ export default function Home() {
               )}
             </div>
           </div>
+          </>}
         </div>
         <p className={`text-center text-xs mt-8 pb-8 ${H.footer}`}>
           Mrs P Oremosu · Loxford School · <span className="font-mono">v{APP_VERSION}</span>
