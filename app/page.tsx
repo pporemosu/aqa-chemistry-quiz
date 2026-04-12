@@ -789,6 +789,7 @@ export default function Home() {
             >
               {lightMode ? '🌙' : '☀️'}
             </button>
+            <p className={`text-2xl font-bold mb-3 tracking-wide ${H.muted}`}>Mrs P Oremosu · Loxford School</p>
             <div className={`inline-block rounded-2xl px-6 py-2 mb-4 text-sm font-medium tracking-widest uppercase ${H.badge}`}>
               AQA 7404 / 7405
             </div>
@@ -1159,7 +1160,7 @@ export default function Home() {
           </>}
         </div>
         <p className={`text-center text-xs mt-8 pb-8 ${H.footer}`}>
-          Mrs P Oremosu · Loxford School · <span className="font-mono">v{APP_VERSION}</span>
+          <span className="font-mono">v{APP_VERSION}</span>
         </p>
       </div>
     );
@@ -1229,6 +1230,9 @@ export default function Home() {
               </span>
             </div>
           </div>
+
+          {/* Teacher / school name */}
+          <p className={`text-center text-xl font-bold mb-3 ${Q.footer}`}>Mrs P Oremosu · Loxford School</p>
 
           {/* Progress bar */}
           <div className={`w-full rounded-full h-2 mb-2 ${Q.progBg}`}>
@@ -1346,7 +1350,7 @@ export default function Home() {
           )}
 
           <p className={`text-center text-xs mt-3 ${Q.footer}`}>
-            Mrs P Oremosu · Loxford School · <span className="font-mono">v{APP_VERSION}</span>
+            <span className="font-mono">v{APP_VERSION}</span>
           </p>
         </div>
       </div>
@@ -1390,6 +1394,9 @@ export default function Home() {
     return (
       <div className={`min-h-screen bg-gradient-to-br ${Q.page}`}>
         <div className="max-w-2xl mx-auto px-4 py-10">
+          {/* Teacher / school name */}
+          <p className={`text-center text-xl font-bold mb-6 ${Q.footer}`}>Mrs P Oremosu · Loxford School</p>
+
           {/* Score header */}
           <div className="text-center mb-8">
             <div className="text-6xl mb-4">{grade.emoji}</div>
@@ -1509,7 +1516,7 @@ export default function Home() {
           </div>
 
           <p className={`text-center text-xs mt-6 ${Q.footer}`}>
-            Mrs P Oremosu · Loxford School · <span className="font-mono">v{APP_VERSION}</span>
+            <span className="font-mono">v{APP_VERSION}</span>
           </p>
         </div>
       </div>
