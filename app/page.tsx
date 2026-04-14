@@ -793,7 +793,7 @@ export default function Home() {
             <div className={`inline-block rounded-2xl px-6 py-2 mb-4 text-sm font-medium tracking-widest uppercase ${H.badge}`}>
               AQA 7404 / 7405
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold mb-3">A-Level Chemistry Quiz</h1>
+            <h1 className="text-4xl md:text-5xl font-bold mb-3">A-level Chemistry Dashboard</h1>
             <p className={`text-lg ${H.muted}`}>Test yourself on every topic from the AQA specification</p>
           </div>
 
@@ -1067,13 +1067,14 @@ export default function Home() {
                   <input
                     type="range"
                     min={1}
-                    max={sliderMax || 1}
-                    value={Math.min(questionCount, sliderMax || 1)}
+                    max={50}
+                    value={questionCount}
                     onChange={(e) => setQuestionCount(Number(e.target.value))}
-                    className="flex-1 accent-purple-500"
+                    className="flex-1 accent-purple-500 cursor-pointer"
+                    style={{ touchAction: 'none' }}
                   />
                   <span className={`text-3xl font-bold w-10 text-center ${H.muted}`}>
-                    {Math.min(questionCount, sliderMax || 0)}
+                    {questionCount}
                   </span>
                 </div>
                 <p className={`text-xs mt-2 ${H.muted}`}>{availableCount} questions available with current filters</p>
@@ -1111,7 +1112,7 @@ export default function Home() {
                 <ul className={`text-sm space-y-1 ${H.summaryText}`}>
                   <li>Topics: <span className={`font-medium ${H.summaryVal}`}>{selectedSubtopics.size === 0 ? 'All topics' : `${selectedSubtopics.size} selected`}</span></li>
                   <li>Difficulty: <span className={`font-medium ${H.summaryVal}`}>{selectedDifficulties.size === 0 ? 'None' : [...selectedDifficulties].join(', ')}</span></li>
-                  <li>Questions: <span className={`font-medium ${H.summaryVal}`}>{Math.min(questionCount, sliderMax || 0)}</span></li>
+                  <li>Questions: <span className={`font-medium ${H.summaryVal}`}>{Math.min(questionCount, availableCount)}</span></li>
                   {timerEnabled && <li>Timer: <span className={`font-medium ${H.summaryVal}`}>{timerSeconds}s per question</span></li>}
                 </ul>
               </div>

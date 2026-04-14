@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'AQA Chemistry Quiz',
+  title: 'A-level Chemistry Dashboard',
   description: 'MCQ revision for AQA AS and A-level Chemistry (7404/7405)',
 }
 
