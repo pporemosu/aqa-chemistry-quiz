@@ -1068,12 +1068,18 @@ export default function Home() {
                     type="range"
                     min={1}
                     max={50}
-                    value={questionCount}
-                    onChange={(e) => setQuestionCount(Number(e.target.value))}
-                    className="flex-1 accent-purple-500 cursor-pointer"
-                    style={{ touchAction: 'none' }}
+                    defaultValue={questionCount}
+                    ref={(el) => { if (el) el.value = String(questionCount); }}
+                    onInput={(e) => {
+                      const v = Number((e.target as HTMLInputElement).value);
+                      const display = document.getElementById('qcount-display');
+                      if (display) display.textContent = String(v);
+                    }}
+                    onMouseUp={(e) => setQuestionCount(Number((e.target as HTMLInputElement).value))}
+                    onTouchEnd={(e) => setQuestionCount(Number((e.currentTarget as HTMLInputElement).value))}
+                    className="flex-1 accent-purple-500 cursor-pointer h-3"
                   />
-                  <span className={`text-3xl font-bold w-10 text-center ${H.muted}`}>
+                  <span id="qcount-display" className={`text-3xl font-bold w-10 text-center ${H.muted}`}>
                     {questionCount}
                   </span>
                 </div>
