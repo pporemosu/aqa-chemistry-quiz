@@ -328,18 +328,18 @@ export default function Home() {
   // ── Quiz ──
   const [quiz, setQuiz] = useState<QuizState | null>(null);
 
-  // ── UI modes (12: light mode, 1: presentation mode) ──
+  // ── UI modes ──
   const [lightMode, setLightMode] = useState(false);
   const [presentationMode, setPresentationMode] = useState(false);
 
-  // ── Feature 9: worked explanation step-through ──
+  // ── Explanation step-through ──
   const [explanationStep, setExplanationStep] = useState(0);
 
   // ── Session history ──
   const [history, setHistory] = useState<SessionRecord[]>([]);
   const savedSession = useRef(false);
 
-  // ── Feature 10: saved sets ──
+  // ── Saved sets ──
   const [savedSets, setSavedSets] = useState<SavedSet[]>([]);
   const [saveSetName, setSaveSetName] = useState('');
   const [showSaveDialog, setShowSaveDialog] = useState(false);
@@ -354,8 +354,6 @@ export default function Home() {
       return topicMatch && selectedDifficulties.has(q.difficulty);
     }).length;
   }, [selectedSubtopics, selectedDifficulties]);
-
-  const sliderMax = Math.min(50, availableCount);
 
   // ── Load persisted state on mount ──
   useEffect(() => {
@@ -455,7 +453,6 @@ export default function Home() {
 
   // ── Helpers ──
 
-  // Feature 12: light mode toggle
   function toggleLightMode() {
     setLightMode((v) => {
       const next = !v;
@@ -464,7 +461,6 @@ export default function Home() {
     });
   }
 
-  // Feature 1: presentation mode toggle (also requests fullscreen)
   async function togglePresentationMode() {
     const next = !presentationMode;
     setPresentationMode(next);
@@ -495,7 +491,6 @@ export default function Home() {
   function selectAll() { setSelectedSubtopics(new Set(TOPICS.flatMap((t) => t.subtopics))); }
   function clearAll() { setSelectedSubtopics(new Set()); }
 
-  // Feature 6: load a lesson pack
   function loadLessonPack(pack: LessonPack) {
     setSelectedSubtopics(pack.subtopics.length > 0 ? new Set(pack.subtopics) : new Set());
     setSelectedDifficulties(new Set<Difficulty>(pack.difficulties));
@@ -504,7 +499,6 @@ export default function Home() {
     window.scrollTo(0, 0);
   }
 
-  // Feature 10: saved sets
   function saveCurrentSet() {
     if (!saveSetName.trim()) return;
     const newSet: SavedSet = {
@@ -641,7 +635,8 @@ export default function Home() {
   const score = useMemo(() => {
     if (!quiz) return 0;
     return quiz.answers.filter((a, i) => a !== null && a >= 0 && a === quiz.selectedQuestions[i].correctAnswer).length;
-  }, [quiz]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quiz?.answers]);
 
   // ── Weak areas ──
   const weakAreas = useMemo(() => {
@@ -651,11 +646,11 @@ export default function Home() {
     return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name]) => name);
   }, [history]);
 
-  const recentTrend = history.slice(0, 10).reverse();
+  const recentTrend = useMemo(() => history.slice(0, 10).reverse(), [history]);
 
   // ── Theme objects ──
 
-  // Home screen theme (Feature 12)
+  // Home screen theme
   const H = {
     page: lightMode
       ? 'from-purple-50 via-white to-indigo-50 text-purple-950'
@@ -664,7 +659,7 @@ export default function Home() {
     card: lightMode ? 'bg-white shadow-sm border border-purple-100' : 'bg-white/10 backdrop-blur',
     label: lightMode ? 'text-purple-700' : 'text-purple-200',
     muted: lightMode ? 'text-purple-500' : 'text-purple-300',
-    veryMuted: lightMode ? 'text-purple-400' : 'text-purple-400',
+    veryMuted: lightMode ? 'text-purple-400' : 'text-purple-500',
     btnToggle: lightMode
       ? 'text-purple-600 hover:text-purple-900 hover:bg-purple-100'
       : 'text-purple-300 hover:text-white hover:bg-white/10',
@@ -697,7 +692,7 @@ export default function Home() {
     saveDialogBg: lightMode ? 'bg-purple-50 border border-purple-200' : 'bg-white/10 border border-white/20',
   };
 
-  // Quiz / Results screen theme (Feature 12)
+  // Quiz / Results screen theme
   const Q = {
     page: lightMode
       ? 'from-gray-50 via-white to-gray-100 text-gray-900'
@@ -719,7 +714,7 @@ export default function Home() {
     optCorrect: lightMode ? 'border-green-500 bg-green-50 text-green-800' : 'border-green-500 bg-green-900/30 text-green-300',
     optWrong: lightMode ? 'border-red-500 bg-red-50 text-red-800' : 'border-red-500 bg-red-900/30 text-red-300',
     optDim: lightMode ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-default' : 'border-gray-600 bg-gray-700/30 text-gray-500 cursor-default',
-    optLetter: lightMode ? 'text-gray-400' : 'text-gray-400',
+    optLetter: lightMode ? 'text-gray-400' : 'text-gray-500',
     expCorrect: lightMode ? 'bg-green-50 border-green-300 text-green-900' : 'bg-green-900/20 border-green-700 text-green-200',
     expWrong: lightMode ? 'bg-red-50 border-red-300 text-red-900' : 'bg-red-900/20 border-red-700 text-red-200',
     expTimeout: lightMode ? 'bg-orange-50 border-orange-300 text-orange-900' : 'bg-orange-900/20 border-orange-700 text-orange-200',
@@ -754,7 +749,7 @@ export default function Home() {
     timeout: lightMode ? 'text-orange-500' : 'text-orange-400',
   };
 
-  // Presentation mode sizes (Feature 1)
+  // Presentation mode sizes
   const P = {
     questionText: presentationMode ? 'text-2xl md:text-3xl leading-relaxed' : 'text-lg font-medium leading-relaxed',
     optionPad: presentationMode ? 'py-5 px-6' : 'py-3.5 px-4',
@@ -915,7 +910,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* ── Feature 6: Lesson Starter Packs ── */}
+          {/* ── Lesson Starter Packs ── */}
           <div className={`rounded-2xl mb-4 overflow-hidden ${H.card}`}>
             <button
               onClick={() => setLessonPacksExpanded((v) => !v)}
@@ -948,7 +943,7 @@ export default function Home() {
             )}
           </div>
 
-          {/* ── Feature 10: Saved Sets ── */}
+          {/* ── Saved Sets ── */}
           {(savedSets.length > 0 || showSaveDialog) && (
             <div className={`rounded-2xl mb-4 overflow-hidden ${H.card}`}>
               <button
@@ -1063,26 +1058,33 @@ export default function Home() {
                 <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <span className="text-2xl">🔢</span> Questions per Session
                 </h2>
-                <div className="flex items-center gap-4">
-                  <input
-                    type="range"
-                    min={1}
-                    max={50}
-                    defaultValue={questionCount}
-                    ref={(el) => { if (el) el.value = String(questionCount); }}
-                    onInput={(e) => {
-                      const v = Number((e.target as HTMLInputElement).value);
-                      const display = document.getElementById('qcount-display');
-                      if (display) display.textContent = String(v);
-                    }}
-                    onMouseUp={(e) => setQuestionCount(Number((e.target as HTMLInputElement).value))}
-                    onTouchEnd={(e) => setQuestionCount(Number((e.currentTarget as HTMLInputElement).value))}
-                    className="flex-1 accent-purple-500 cursor-pointer h-3"
-                  />
-                  <span id="qcount-display" className={`text-3xl font-bold w-10 text-center ${H.muted}`}>
-                    {questionCount}
-                  </span>
+                <div className="flex items-center gap-3 mb-3">
+                  <button
+                    onClick={() => setQuestionCount((v) => Math.max(1, v - 5))}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-colors ${H.btnClear}`}
+                  >−5</button>
+                  <button
+                    onClick={() => setQuestionCount((v) => Math.max(1, v - 1))}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-colors ${H.btnClear}`}
+                  >−1</button>
+                  <span className={`text-3xl font-bold flex-1 text-center ${H.muted}`}>{questionCount}</span>
+                  <button
+                    onClick={() => setQuestionCount((v) => Math.min(50, v + 1))}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-colors ${H.btnClear}`}
+                  >+1</button>
+                  <button
+                    onClick={() => setQuestionCount((v) => Math.min(50, v + 5))}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-colors ${H.btnClear}`}
+                  >+5</button>
                 </div>
+                <input
+                  type="range"
+                  min={1}
+                  max={50}
+                  value={questionCount}
+                  onChange={(e) => setQuestionCount(Number(e.target.value))}
+                  className="w-full accent-purple-500 cursor-pointer"
+                />
                 <p className={`text-xs mt-2 ${H.muted}`}>{availableCount} questions available with current filters</p>
               </div>
 
@@ -1132,7 +1134,7 @@ export default function Home() {
                 Start Quiz →
               </button>
 
-              {/* Feature 10: Save settings button */}
+              {/* Save settings as a named set */}
               {!showSaveDialog ? (
                 <button
                   onClick={() => setShowSaveDialog(true)}
@@ -1193,7 +1195,7 @@ export default function Home() {
     const timerBarColor = timerPct > 50 ? 'bg-green-500' : timerPct > 25 ? 'bg-yellow-500' : 'bg-red-500';
     const timerTextColor = timerPct > 50 ? 'text-green-400' : timerPct > 25 ? 'text-yellow-400' : 'text-red-400';
 
-    // Feature 9: worked explanation step-through
+    // Worked explanation step-through
     const expSentences = splitExplanation(q.explanation);
     const visibleCount = isReviewing ? expSentences.length : explanationStep;
     const visibleSentences = expSentences.slice(0, visibleCount);
@@ -1212,7 +1214,7 @@ export default function Home() {
               ← Home
             </button>
             <div className="flex items-center gap-3">
-              {/* Feature 12 + 1: light mode & presentation mode toggles */}
+              {/* Light mode & presentation mode toggles */}
               <button
                 onClick={toggleLightMode}
                 title={lightMode ? 'Dark mode' : 'Light mode'}
@@ -1297,7 +1299,7 @@ export default function Home() {
               })}
             </div>
 
-            {/* Feature 9: Worked explanation (step-through) */}
+            {/* Worked explanation (step-through) */}
             {answered && (
               <div className={`mt-5 p-4 rounded-xl border ${expClass} ${P.exp}`}>
                 <span className="font-bold">{expPrefix}</span>
